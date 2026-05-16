@@ -1,3 +1,26 @@
+// ============================================================
+// Sophia and the Rat Jungle
+// ============================================================
+// SAVE SHAPE: locked at version 1. See SaveManager.
+//
+// PUZZLE ORDER (Session 3+):
+//   1. Colour match  (DONE — flower puzzle near tall tree)
+//   2. Counting      (Act 2, across bridge — meadow area)
+//   3. Pattern       (Act 3 — light-up sequence in new clearing)
+//   4. Memory match  (Act 4 — separate scene inside cave)
+//   5. Word/letter   (Act 5 — spell PARTY to unlock Golden Banana)
+//
+// BRIDGE GATE: bananaCount >= 3 (cumulative, any 3 bananas)
+// SOPHIA SPAWN: always (1200, 900). Position not persisted.
+//
+// STORY ARC: Sophia throws a party for Snowy + Midnight. Each act
+// rewards a party item (bananas/flowers/stones/music/Golden Banana).
+// Finale = party scene + Play Again.
+//
+// CAVE: currently Option A (dim-overlay). Graduate to Option B
+// (separate scene) when wiring memory match in Session 4.
+// ============================================================
+
 const SOPHIA_SPEED = 200;
 const RAT_GAP = 40;
 const RAT_LERP = 0.08;
