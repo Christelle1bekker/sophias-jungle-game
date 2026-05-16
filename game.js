@@ -1,22 +1,27 @@
 const SOPHIA_SPEED = 200;
 const RAT_GAP = 40;
 const RAT_LERP = 0.08;
+const WORLD_W = 2400;
+const WORLD_H = 1800;
+const CAVE_CENTER = { x: 2000, y: 280 };
+const CAVE_DIM_RADIUS = 320;
 
 const PEEK_SPOTS = [
-  { id: 'waterfall', x: 700, y: 430 }
+  { id: 'waterfall',    x: 1500, y: 1030 },
+  { id: 'beach-sunset', x: 500,  y: 1450 }
 ];
 
 const BANANA_SPOTS = [
-  { x: 430, y: 290 },
-  { x: 170, y: 230 },
-  { x: 360, y: 480 },
-  { x: 160, y: 440 },
-  { x: 540, y: 280 },
-  { x: 260, y: 180 },
-  { x: 610, y: 440 },
-  { x: 60,  y: 90  },
-  { x: 460, y: 555 },
-  { x: 510, y: 540 }
+  { x: 200,  y: 250  },
+  { x: 1100, y: 250  },
+  { x: 1850, y: 400  },
+  { x: 2000, y: 220  },
+  { x: 470,  y: 1020 },
+  { x: 1300, y: 900  },
+  { x: 1900, y: 870  },
+  { x: 320,  y: 1430 },
+  { x: 1300, y: 1380 },
+  { x: 2100, y: 1450 }
 ];
 
 let audioCtx = null;
@@ -83,62 +88,15 @@ class TopDownScene extends Phaser.Scene {
     if (!this.registry.has('collectedBananas')) this.registry.set('collectedBananas', []);
     if (!this.registry.has('bananaCount')) this.registry.set('bananaCount', 0);
 
-    for (let i = 0; i < 14; i++) {
-      const x = Phaser.Math.Between(20, 780);
-      const y = Phaser.Math.Between(20, 580);
-      const r = Phaser.Math.Between(30, 80);
-      const shade = Phaser.Math.RND.pick([0x3a9c4a, 0x267d3a, 0x4eb05c]);
-      this.add.ellipse(x, y, r * 2, r, shade, 0.4);
-    }
+    this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
 
-    this.add.rectangle(700, 70, 100, 18, 0x6b4423);
-    this.add.rectangle(680, 78, 18, 12, 0x4a2c1a);
-    this.add.rectangle(720, 78, 18, 12, 0x4a2c1a);
-    this.add.rectangle(700, 200, 60, 250, 0x6fa8dc);
-    this.add.rectangle(700, 200, 50, 250, 0xa3cef0, 0.7);
-    for (let i = 0; i < 8; i++) {
-      const drop = this.add.rectangle(
-        700 + Phaser.Math.Between(-22, 22),
-        90 + i * 30,
-        Phaser.Math.Between(4, 8),
-        Phaser.Math.Between(12, 22),
-        0xffffff, 0.85
-      );
-      this.waterfallDrops.push(drop);
-    }
-    this.add.ellipse(700, 350, 150, 55, 0x2e6da4);
-    this.add.ellipse(700, 350, 130, 45, 0x4a90c8);
-    this.add.ellipse(700, 348, 100, 30, 0x6fa8dc, 0.7);
-    this.add.ellipse(685, 345, 20, 6, 0xffffff, 0.6);
-    this.add.ellipse(715, 352, 20, 6, 0xffffff, 0.6);
-
-    this.makePalmTree(100, 150);
-    this.makePalmTree(250, 500);
-    this.makePalmTree(480, 110);
-    this.makeRoundTree(180, 350);
-    this.makeRoundTree(560, 500);
-    this.makeRoundTree(380, 210);
-    this.makePineTree(50, 400);
-    this.makePineTree(330, 90);
-    this.makePineTree(540, 380);
-
-    this.makeStump(220, 240);
-    this.makeStump(440, 410);
-    this.makeStump(130, 510);
-
-    const flowerColors = [0xff5e7e, 0xffe066, 0xff8e3c, 0xb967ff, 0xff6b6b, 0xffffff, 0xff4081, 0x9c27b0];
-    for (let i = 0; i < 70; i++) {
-      const x = Phaser.Math.Between(20, 780);
-      const y = Phaser.Math.Between(20, 580);
-      if (this.solids.some(s => Math.abs(s.x - x) < 30 && Math.abs(s.y - y) < 30)) continue;
-      if (Math.abs(x - 700) < 75 && y > 50 && y < 380) continue;
-      if (Math.abs(x - 700) < 30 && Math.abs(y - 430) < 30) continue;
-      if (BANANA_SPOTS.some(b => Math.abs(b.x - x) < 25 && Math.abs(b.y - y) < 25)) continue;
-      const c = Phaser.Math.RND.pick(flowerColors);
-      const size = Phaser.Math.FloatBetween(4, 8);
-      this.add.circle(x, y, size, c);
-      this.add.circle(x, y, size * 0.4, 0xffeb3b);
-    }
+    this.buildBeach();
+    this.buildNorthwestForest();
+    this.buildTallTreeArea();
+    this.buildCaveArea();
+    this.buildRiverBridge();
+    this.buildCenterJungle();
+    this.buildEastTrail();
 
     for (const spot of PEEK_SPOTS) this.makePeekMarker(spot);
 
@@ -148,8 +106,8 @@ class TopDownScene extends Phaser.Scene {
       this.bananas.push(this.makeBanana(spot.x, spot.y, i));
     });
 
-    const startX = (data && data.returnTo && data.returnTo.x) || 400;
-    const startY = (data && data.returnTo && data.returnTo.y) || 300;
+    const startX = (data && data.returnTo && data.returnTo.x) || 1200;
+    const startY = (data && data.returnTo && data.returnTo.y) || 900;
     this.sophia = this.createSophia(startX, startY);
 
     this.snowy = this.createRat(startX - 40, startY, {
@@ -163,13 +121,265 @@ class TopDownScene extends Phaser.Scene {
 
     this.snowyLabel = this.makeNameLabel('Snowy');
     this.midnightLabel = this.makeNameLabel('Midnight');
+    this.snowyLabel.setDepth(850);
+    this.midnightLabel.setDepth(850);
 
     this.makeCounterUI();
+
+    this.caveDim = this.add.rectangle(400, 300, 800, 600, 0x05050f, 0)
+      .setScrollFactor(0)
+      .setDepth(800);
+    this.caveLight = this.add.circle(400, 300, 140, 0xffe082, 0)
+      .setScrollFactor(0)
+      .setDepth(801);
+    this.caveLight.setBlendMode(Phaser.BlendModes.ADD);
+
+    this.cameras.main.startFollow(this.sophia, true, 0.12, 0.12);
 
     this.cursors = this.input.keyboard.createCursorKeys();
     this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
     this.cameras.main.fadeIn(350, 255, 255, 255);
+  }
+
+  buildBeach() {
+    this.add.rectangle(WORLD_W / 2, 1500, WORLD_W, 600, 0xf5deb3);
+    this.add.rectangle(WORLD_W / 2, 1680, WORLD_W, 240, 0xd4b483, 0.6);
+    this.add.rectangle(WORLD_W / 2, 1780, WORLD_W, 80, 0x4a90c8);
+    this.add.rectangle(WORLD_W / 2, 1775, WORLD_W, 60, 0x6fa8dc, 0.85);
+    this.add.rectangle(WORLD_W / 2, 1772, WORLD_W, 30, 0xa3cef0, 0.55);
+    for (let i = 0; i < 30; i++) {
+      const x = 40 + i * 80 + Phaser.Math.Between(-15, 15);
+      const ripple = this.add.ellipse(x, 1745 + Phaser.Math.Between(-3, 5), 60, 9, 0xffffff, 0.75);
+      this.tweens.add({ targets: ripple, scaleX: { from: 0.9, to: 1.2 }, alpha: { from: 0.75, to: 0.4 }, duration: 1600 + Phaser.Math.Between(0, 600), yoyo: true, repeat: -1, delay: i * 80 });
+    }
+    for (let i = 0; i < 12; i++) {
+      const x = Phaser.Math.Between(50, WORLD_W - 50);
+      const y = 1260 + Phaser.Math.Between(0, 110);
+      this.add.ellipse(x, y, 36, 12, 0x9caf88, 0.55);
+    }
+    this.makePalmTree(200, 1320);
+    this.makePalmTree(450, 1380);
+    this.makePalmTree(800, 1300);
+    this.makePalmTree(1100, 1360);
+    this.makePalmTree(1500, 1310);
+    this.makePalmTree(1750, 1370);
+    this.makePalmTree(2050, 1320);
+    this.makePalmTree(2300, 1380);
+    this.add.ellipse(620, 1620, 22, 12, 0xffe0d0).setRotation(0.3);
+    this.add.ellipse(1180, 1660, 16, 9, 0xffd0c0).setRotation(-0.5);
+    this.add.ellipse(1820, 1640, 18, 10, 0xffe4d0).setRotation(0.2);
+    this.add.circle(900, 1700, 5, 0xff7043);
+    this.add.circle(900, 1700, 3, 0xff8a65);
+    this.add.circle(2200, 1690, 5, 0xff7043);
+    this.add.circle(2200, 1690, 3, 0xff8a65);
+  }
+
+  buildNorthwestForest() {
+    for (let i = 0; i < 10; i++) {
+      const x = Phaser.Math.Between(20, 780);
+      const y = Phaser.Math.Between(20, 580);
+      const r = Phaser.Math.Between(40, 90);
+      this.add.ellipse(x, y, r * 2, r, 0x1b5e20, 0.45);
+    }
+    for (let i = 0; i < 30; i++) {
+      const x = Phaser.Math.Between(20, 780);
+      const y = Phaser.Math.Between(20, 580);
+      const c = Phaser.Math.RND.pick([0xff5e7e, 0xffe066, 0xffffff, 0xff8e3c]);
+      this.add.circle(x, y, Phaser.Math.FloatBetween(3, 6), c);
+      this.add.circle(x, y, 1.5, 0xffeb3b);
+    }
+    this.makePineTree(110, 220);
+    this.makePineTree(220, 450);
+    this.makePineTree(340, 320);
+    this.makePineTree(480, 180);
+    this.makePineTree(620, 470);
+    this.makePineTree(710, 330);
+    this.makeRoundTree(280, 100);
+    this.makeRoundTree(520, 540);
+    this.makeRoundTree(700, 150);
+    this.makeRoundTree(150, 540);
+    this.makeStump(420, 380);
+    this.makeStump(620, 230);
+  }
+
+  buildTallTreeArea() {
+    this.add.ellipse(1200, 340, 700, 460, 0x4eb05c, 0.35);
+    this.add.ellipse(1200, 500, 260, 60, 0x2e7d32, 0.7);
+    this.makeTallTree(1200, 500);
+    this.add.circle(1060, 520, 9, 0xc62828);
+    this.add.circle(1060, 520, 6, 0xffffff, 0.7);
+    this.add.ellipse(1060, 528, 7, 9, 0xfff3a8);
+    this.add.circle(1350, 530, 8, 0xc62828);
+    this.add.circle(1350, 530, 5, 0xffffff, 0.7);
+    this.add.ellipse(1350, 537, 6, 8, 0xfff3a8);
+    this.add.circle(1260, 540, 7, 0xc62828);
+    this.add.circle(1260, 540, 4, 0xffffff, 0.7);
+    this.makePineTree(880, 240);
+    this.makePineTree(1520, 200);
+    this.makeRoundTree(950, 480);
+    this.makeRoundTree(1500, 460);
+    for (let i = 0; i < 25; i++) {
+      const x = Phaser.Math.Between(820, 1580);
+      const y = Phaser.Math.Between(40, 580);
+      if (Math.abs(x - 1200) < 90 && Math.abs(y - 400) < 200) continue;
+      const c = Phaser.Math.RND.pick([0xffe066, 0xffffff, 0xff8e3c, 0xb967ff]);
+      this.add.circle(x, y, Phaser.Math.FloatBetween(3, 5), c);
+      this.add.circle(x, y, 1.5, 0xffeb3b);
+    }
+  }
+
+  buildCaveArea() {
+    for (let i = 0; i < 12; i++) {
+      const x = 1620 + Phaser.Math.Between(0, 760);
+      const y = Phaser.Math.Between(20, 580);
+      const r = Phaser.Math.Between(30, 60);
+      this.add.ellipse(x, y, r * 2, r * 0.7, 0x7a7a7a, 0.35);
+    }
+    this.add.rectangle(2000, 80, 760, 180, 0x6a6a6a);
+    this.add.ellipse(2000, 120, 780, 90, 0x5a5a5a, 0.7);
+    this.add.ellipse(1700, 80, 200, 60, 0x8a8a8a, 0.5);
+    this.add.ellipse(2300, 80, 200, 60, 0x8a8a8a, 0.5);
+
+    const cx = CAVE_CENTER.x, cy = CAVE_CENTER.y;
+    this.add.ellipse(cx, cy, 200, 240, 0x0a0a0a);
+    this.add.ellipse(cx, cy + 10, 170, 210, 0x000000);
+    this.add.ellipse(cx, cy + 40, 130, 160, 0x000000);
+    this.add.ellipse(cx - 60, cy - 80, 30, 18, 0x4a4a4a);
+    this.add.ellipse(cx + 60, cy - 80, 30, 18, 0x4a4a4a);
+
+    this.makeBoulder(1820, 400);
+    this.makeBoulder(2180, 430);
+    this.makeBoulder(2230, 290);
+    this.makeBoulder(1790, 290);
+    this.add.ellipse(1900, 480, 32, 14, 0x5a5a5a);
+    this.add.ellipse(2080, 500, 42, 18, 0x6a6a6a);
+    this.add.ellipse(2160, 520, 26, 12, 0x4a4a4a);
+    this.add.ellipse(2020, 540, 30, 14, 0x7a7a7a);
+  }
+
+  buildRiverBridge() {
+    this.add.rectangle(300, 900, 130, 600, 0x2e6da4);
+    this.add.rectangle(300, 900, 110, 600, 0x4a90c8);
+    this.add.rectangle(300, 900, 90, 600, 0x6fa8dc, 0.85);
+    this.add.rectangle(290, 900, 22, 600, 0xa3cef0, 0.5);
+    this.add.rectangle(316, 900, 16, 600, 0xa3cef0, 0.4);
+    for (let i = 0; i < 12; i++) {
+      const ry = 620 + i * 48;
+      const ripple = this.add.ellipse(300 + Phaser.Math.Between(-30, 30), ry, 60, 8, 0xffffff, 0.45);
+      this.tweens.add({ targets: ripple, scaleX: { from: 0.7, to: 1.1 }, alpha: { from: 0.5, to: 0.15 }, duration: 2400, yoyo: true, repeat: -1, delay: i * 200 });
+    }
+
+    this.solids.push({ x: 300, y: 900, w: 130, h: 600 });
+
+    const bx = 300, by = 900;
+    this.add.rectangle(bx - 130, by, 50, 36, 0x6a6a6a);
+    this.add.rectangle(bx + 130, by, 50, 36, 0x6a6a6a);
+    this.add.ellipse(bx - 130, by - 18, 50, 14, 0x8a8a8a);
+    this.add.ellipse(bx + 130, by - 18, 50, 14, 0x8a8a8a);
+    this.add.rectangle(bx - 90, by, 36, 16, 0x8b5a2b);
+    this.add.rectangle(bx - 50, by, 26, 16, 0x6b4423);
+    this.add.rectangle(bx + 60, by, 30, 16, 0x8b5a2b);
+    this.add.rectangle(bx + 100, by, 28, 16, 0x6b4423);
+    this.add.rectangle(bx - 105, by - 22, 4, 36, 0x5d3a1a);
+    this.add.rectangle(bx - 50, by - 22, 4, 30, 0x5d3a1a);
+    this.add.rectangle(bx + 50, by - 22, 4, 30, 0x5d3a1a);
+    this.add.rectangle(bx + 105, by - 22, 4, 36, 0x5d3a1a);
+    this.add.rectangle(bx - 105, by - 32, 110, 4, 0x6b4423);
+    this.add.rectangle(bx + 105, by - 32, 110, 4, 0x6b4423);
+
+    const glow = this.add.ellipse(bx, by, 240, 60, 0xfff3a8, 0.3);
+    this.tweens.add({ targets: glow, alpha: { from: 0.15, to: 0.55 }, scaleX: { from: 0.85, to: 1.1 }, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+
+    this.bridgeHookSpot = { x: 470, y: 900 };
+
+    this.makePineTree(80, 720);
+    this.makeRoundTree(150, 1080);
+    this.makePalmTree(580, 720);
+    this.makeRoundTree(640, 1080);
+    this.makeStump(530, 840);
+  }
+
+  buildCenterJungle() {
+    const OX = 800, OY = 600;
+    for (let i = 0; i < 14; i++) {
+      const x = OX + Phaser.Math.Between(20, 780);
+      const y = OY + Phaser.Math.Between(20, 580);
+      const r = Phaser.Math.Between(30, 80);
+      const shade = Phaser.Math.RND.pick([0x3a9c4a, 0x267d3a, 0x4eb05c]);
+      this.add.ellipse(x, y, r * 2, r, shade, 0.4);
+    }
+
+    this.waterfallCenterX = OX + 700;
+    this.waterfallDropResetY = OY + 330;
+    this.waterfallDropStartY = OY + 85;
+
+    this.add.rectangle(OX + 700, OY + 70, 100, 18, 0x6b4423);
+    this.add.rectangle(OX + 680, OY + 78, 18, 12, 0x4a2c1a);
+    this.add.rectangle(OX + 720, OY + 78, 18, 12, 0x4a2c1a);
+    this.add.rectangle(OX + 700, OY + 200, 60, 250, 0x6fa8dc);
+    this.add.rectangle(OX + 700, OY + 200, 50, 250, 0xa3cef0, 0.7);
+    for (let i = 0; i < 8; i++) {
+      const drop = this.add.rectangle(
+        OX + 700 + Phaser.Math.Between(-22, 22),
+        OY + 90 + i * 30,
+        Phaser.Math.Between(4, 8),
+        Phaser.Math.Between(12, 22),
+        0xffffff, 0.85
+      );
+      this.waterfallDrops.push(drop);
+    }
+    this.add.ellipse(OX + 700, OY + 350, 150, 55, 0x2e6da4);
+    this.add.ellipse(OX + 700, OY + 350, 130, 45, 0x4a90c8);
+    this.add.ellipse(OX + 700, OY + 348, 100, 30, 0x6fa8dc, 0.7);
+    this.add.ellipse(OX + 685, OY + 345, 20, 6, 0xffffff, 0.6);
+    this.add.ellipse(OX + 715, OY + 352, 20, 6, 0xffffff, 0.6);
+
+    this.makePalmTree(OX + 100, OY + 150);
+    this.makePalmTree(OX + 250, OY + 500);
+    this.makePalmTree(OX + 480, OY + 110);
+    this.makeRoundTree(OX + 180, OY + 350);
+    this.makeRoundTree(OX + 560, OY + 500);
+    this.makeRoundTree(OX + 380, OY + 210);
+    this.makePineTree(OX + 50, OY + 400);
+    this.makePineTree(OX + 330, OY + 90);
+    this.makePineTree(OX + 540, OY + 380);
+    this.makeStump(OX + 220, OY + 240);
+    this.makeStump(OX + 440, OY + 410);
+    this.makeStump(OX + 130, OY + 510);
+
+    const flowerColors = [0xff5e7e, 0xffe066, 0xff8e3c, 0xb967ff, 0xff6b6b, 0xffffff, 0xff4081];
+    for (let i = 0; i < 50; i++) {
+      const x = OX + Phaser.Math.Between(20, 780);
+      const y = OY + Phaser.Math.Between(20, 580);
+      if (this.solids.some(s => Math.abs(s.x - x) < 30 && Math.abs(s.y - y) < 30)) continue;
+      if (Math.abs(x - (OX + 700)) < 75 && y > OY + 50 && y < OY + 380) continue;
+      const c = Phaser.Math.RND.pick(flowerColors);
+      const size = Phaser.Math.FloatBetween(4, 8);
+      this.add.circle(x, y, size, c);
+      this.add.circle(x, y, size * 0.4, 0xffeb3b);
+    }
+  }
+
+  buildEastTrail() {
+    this.add.ellipse(1820, 880, 320, 90, 0xc4a877, 0.45);
+    this.add.ellipse(2030, 820, 280, 70, 0xc4a877, 0.4);
+    this.add.ellipse(2230, 950, 240, 60, 0xc4a877, 0.4);
+    this.add.ellipse(2100, 1080, 200, 50, 0xc4a877, 0.35);
+    this.makePalmTree(1720, 720);
+    this.makePalmTree(2280, 720);
+    this.makeRoundTree(2180, 760);
+    this.makePineTree(1700, 1080);
+    this.makePineTree(2330, 1050);
+    this.makeStump(1900, 1080);
+    this.makeStump(2050, 760);
+    for (let i = 0; i < 18; i++) {
+      const x = Phaser.Math.Between(1620, 2380);
+      const y = Phaser.Math.Between(620, 1180);
+      const c = Phaser.Math.RND.pick([0xffe066, 0xff8e3c, 0xffffff]);
+      this.add.circle(x, y, Phaser.Math.FloatBetween(3, 5), c);
+      this.add.circle(x, y, 1.5, 0xffeb3b);
+    }
   }
 
   createSophia(x, y) {
@@ -196,21 +406,18 @@ class TopDownScene extends Phaser.Scene {
     const rightArm = this.add.rectangle(13, 0, 5, 12, skin);
     const handL = this.add.circle(-13, 6, 3, skin);
     const handR = this.add.circle(13, 6, 3, skin);
-
     const hairBack = this.add.circle(0, -13, 13, blonde);
     const hairBackShade = this.add.ellipse(0, -7, 22, 8, blondeShadow);
     const face = this.add.circle(0, -12, 9, skin);
     const bangs1 = this.add.ellipse(-5, -18, 11, 7, blonde);
     const bangs2 = this.add.ellipse(5, -18, 11, 7, blonde);
     const bangs3 = this.add.ellipse(0, -20, 16, 5, blonde);
-
     const eyeL = this.add.circle(-3, -11, 1.6, 0x2a2a2a);
     const eyeR = this.add.circle(3, -11, 1.6, 0x2a2a2a);
     const eyeLHi = this.add.circle(-2.5, -11.3, 0.6, 0xffffff);
     const eyeRHi = this.add.circle(3.5, -11.3, 0.6, 0xffffff);
     const cheekL = this.add.circle(-6, -8, 1.8, 0xffb3b3, 0.7);
     const cheekR = this.add.circle(6, -8, 1.8, 0xffb3b3, 0.7);
-
     const smile = this.add.graphics();
     smile.lineStyle(1.5, 0x8b3a3a, 1);
     smile.beginPath();
@@ -218,21 +425,15 @@ class TopDownScene extends Phaser.Scene {
     smile.strokePath();
 
     c.add([
-      shadow,
-      leftShoe, rightShoe,
-      leftLeg, rightLeg,
-      shortsBg, shortsHi,
-      shirtBg, shirtHi, collar,
+      shadow, leftShoe, rightShoe, leftLeg, rightLeg,
+      shortsBg, shortsHi, shirtBg, shirtHi, collar,
       leftArm, rightArm, handL, handR,
-      hairBack, hairBackShade,
-      face,
+      hairBack, hairBackShade, face,
       bangs1, bangs2, bangs3,
       eyeL, eyeR, eyeLHi, eyeRHi,
-      cheekL, cheekR,
-      smile
+      cheekL, cheekR, smile
     ]);
-    c.hitW = 22;
-    c.hitH = 30;
+    c.hitW = 22; c.hitH = 30;
     c.setSize(22, 30);
     return c;
   }
@@ -242,9 +443,7 @@ class TopDownScene extends Phaser.Scene {
     const bodyW = (22 + chub) * sf;
     const bodyH = (14 + chub * 0.7) * sf;
     const c = this.add.container(x, y);
-
     const shadow = this.add.ellipse(0, bodyH / 2 + 2, bodyW + 4, 5, 0x000000, 0.3);
-
     const tail = this.add.graphics();
     tail.lineStyle(2.5 * sf, colors.tail, 1);
     tail.beginPath();
@@ -253,31 +452,24 @@ class TopDownScene extends Phaser.Scene {
     tail.lineTo(-bodyW / 2 - 9 * sf, 2 * sf);
     tail.lineTo(-bodyW / 2 - 13 * sf, -2 * sf);
     tail.strokePath();
-
     const f1 = this.add.ellipse(-bodyW / 2 + 4, -bodyH / 2 - 1, 4 * sf, 5 * sf, colors.foot);
     const f2 = this.add.ellipse(-bodyW / 2 + 4, bodyH / 2 + 1, 4 * sf, 5 * sf, colors.foot);
     const f3 = this.add.ellipse(bodyW / 2 - 4, -bodyH / 2 - 1, 4 * sf, 5 * sf, colors.foot);
     const f4 = this.add.ellipse(bodyW / 2 - 4, bodyH / 2 + 1, 4 * sf, 5 * sf, colors.foot);
-
     const body = this.add.ellipse(0, 0, bodyW, bodyH, colors.body);
     const bodyShade = this.add.ellipse(0, bodyH / 4, bodyW * 0.8, bodyH * 0.3, colors.bodyShadow);
-
     const headX = bodyW / 2 - 2 * sf;
     const head = this.add.circle(headX, 0, 8 * sf, colors.body);
     const headShade = this.add.ellipse(headX, 3 * sf, 12 * sf, 3 * sf, colors.bodyShadow);
-
     const earL = this.add.circle(headX + 2 * sf, -5 * sf, 3.6 * sf, colors.body);
     const earR = this.add.circle(headX + 2 * sf, 5 * sf, 3.6 * sf, colors.body);
     const earLInner = this.add.circle(headX + 2 * sf, -5 * sf, 2 * sf, colors.ear);
     const earRInner = this.add.circle(headX + 2 * sf, 5 * sf, 2 * sf, colors.ear);
-
     const eyeL = this.add.circle(headX + 2 * sf, -2.4 * sf, 1.7 * sf, colors.eye);
     const eyeR = this.add.circle(headX + 2 * sf, 2.4 * sf, 1.7 * sf, colors.eye);
     const eyeLHi = this.add.circle(headX + 2.4 * sf, -2.7 * sf, 0.7 * sf, 0xffffff);
     const eyeRHi = this.add.circle(headX + 2.4 * sf, 2.1 * sf, 0.7 * sf, 0xffffff);
-
     const nose = this.add.circle(headX + 7 * sf, 0, 1.9 * sf, colors.nose);
-
     const whiskers = this.add.graphics();
     whiskers.lineStyle(0.6, 0x888888, 0.8);
     whiskers.beginPath();
@@ -290,18 +482,12 @@ class TopDownScene extends Phaser.Scene {
     whiskers.strokePath();
 
     c.add([
-      shadow,
-      tail,
-      f1, f2, f3, f4,
-      body, bodyShade,
-      head, headShade,
+      shadow, tail, f1, f2, f3, f4,
+      body, bodyShade, head, headShade,
       earL, earR, earLInner, earRInner,
-      eyeL, eyeR, eyeLHi, eyeRHi,
-      nose,
-      whiskers
+      eyeL, eyeR, eyeLHi, eyeRHi, nose, whiskers
     ]);
-    c.hitW = bodyW + 4;
-    c.hitH = bodyH + 4;
+    c.hitW = bodyW + 4; c.hitH = bodyH + 4;
     c.setSize(bodyW + 4, bodyH + 4);
     return c;
   }
@@ -321,12 +507,11 @@ class TopDownScene extends Phaser.Scene {
     this.add.rectangle(78, 32, 132, 50, 0x000000, 0.55)
       .setStrokeStyle(3, 0xffeb3b, 0.9)
       .setOrigin(0.5, 0.5)
-      .setScrollFactor(0);
-
-    const iconG = this.add.graphics().setScrollFactor(0);
+      .setScrollFactor(0)
+      .setDepth(1000);
+    const iconG = this.add.graphics().setScrollFactor(0).setDepth(1000);
     iconG.x = 38; iconG.y = 32;
     this.drawBananaShape(iconG, 0.95);
-
     const count = this.registry.get('bananaCount');
     this.bananaText = this.add.text(60, 32, '× ' + count, {
       fontFamily: 'Comic Sans MS, Chalkboard SE, system-ui, sans-serif',
@@ -335,7 +520,7 @@ class TopDownScene extends Phaser.Scene {
       stroke: '#000000',
       strokeThickness: 4,
       fontStyle: 'bold'
-    }).setOrigin(0, 0.5).setScrollFactor(0);
+    }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(1000);
   }
 
   drawBananaShape(g, scale) {
@@ -440,6 +625,39 @@ class TopDownScene extends Phaser.Scene {
     this.solids.push({ x, y, w: 30, h: 14 });
   }
 
+  makeTallTree(x, y) {
+    this.add.ellipse(x, y + 10, 80, 18, 0x000000, 0.3);
+    this.add.ellipse(x, y + 4, 60, 18, 0x4a2c1a);
+    this.add.rectangle(x, y, 36, 220, 0x8b5a2b).setOrigin(0.5, 1);
+    this.add.rectangle(x - 7, y - 110, 8, 200, 0x6b4423);
+    this.add.rectangle(x + 9, y - 110, 4, 200, 0xa67248, 0.6);
+    this.add.ellipse(x + 8, y - 40, 14, 22, 0x2a1810);
+    this.add.ellipse(x + 8, y - 40, 10, 16, 0x000000);
+    this.add.ellipse(x + 8.5, y - 38, 5, 8, 0x1a0805);
+    this.add.circle(x, y - 240, 78, 0x1b5e20);
+    this.add.circle(x - 50, y - 220, 52, 0x2e7d32);
+    this.add.circle(x + 50, y - 230, 52, 0x388e3c);
+    this.add.circle(x - 20, y - 280, 48, 0x4caf50);
+    this.add.circle(x + 25, y - 270, 46, 0x66bb6a);
+    this.add.circle(x, y - 320, 38, 0x4caf50);
+    this.add.circle(x - 30, y - 180, 6, 0xe53935);
+    this.add.circle(x + 28, y - 195, 6, 0xe53935);
+    this.add.circle(x - 8, y - 240, 5, 0xe53935);
+    this.add.circle(x + 45, y - 220, 5, 0xe53935);
+    this.add.circle(x - 50, y - 250, 5, 0xe53935);
+    this.add.circle(x + 10, y - 290, 5, 0xe53935);
+    this.solids.push({ x, y: y - 6, w: 30, h: 18 });
+  }
+
+  makeBoulder(x, y) {
+    this.add.ellipse(x, y + 8, 70, 14, 0x000000, 0.3);
+    this.add.circle(x, y, 30, 0x6a6a6a);
+    this.add.circle(x - 10, y - 8, 22, 0x7a7a7a);
+    this.add.circle(x + 8, y - 6, 18, 0x8a8a8a);
+    this.add.circle(x - 6, y + 5, 14, 0x5a5a5a);
+    this.solids.push({ x, y, w: 56, h: 50 });
+  }
+
   update(time, delta) {
     if (this.exiting) return;
     const step = SOPHIA_SPEED * (delta / 1000);
@@ -451,8 +669,8 @@ class TopDownScene extends Phaser.Scene {
 
     const oldX = this.sophia.x, oldY = this.sophia.y;
     this.tryMove(this.sophia, dx, dy);
-    this.sophia.x = Phaser.Math.Clamp(this.sophia.x, 16, 784);
-    this.sophia.y = Phaser.Math.Clamp(this.sophia.y, 16, 584);
+    this.sophia.x = Phaser.Math.Clamp(this.sophia.x, 16, WORLD_W - 16);
+    this.sophia.y = Phaser.Math.Clamp(this.sophia.y, 16, WORLD_H - 16);
     const sophiaMoving = (Math.abs(this.sophia.x - oldX) > 0.1) || (Math.abs(this.sophia.y - oldY) > 0.1);
     this.sophia.scaleY = sophiaMoving ? 1 + Math.sin(time / 90) * 0.06 : 1;
 
@@ -467,7 +685,10 @@ class TopDownScene extends Phaser.Scene {
 
     for (const drop of this.waterfallDrops) {
       drop.y += 4;
-      if (drop.y > 330) { drop.y = 85; drop.x = 700 + Phaser.Math.Between(-22, 22); }
+      if (drop.y > this.waterfallDropResetY) {
+        drop.y = this.waterfallDropStartY;
+        drop.x = this.waterfallCenterX + Phaser.Math.Between(-22, 22);
+      }
     }
 
     let nearest = null, nearestDist = Infinity;
@@ -490,6 +711,13 @@ class TopDownScene extends Phaser.Scene {
         this.bananas.splice(i, 1);
       }
     }
+
+    const cd = Phaser.Math.Distance.Between(this.sophia.x, this.sophia.y, CAVE_CENTER.x, CAVE_CENTER.y);
+    const darkness = Phaser.Math.Clamp(1 - cd / CAVE_DIM_RADIUS, 0, 1);
+    this.caveDim.alpha = darkness * 0.85;
+    this.caveLight.alpha = darkness * 0.95;
+    this.caveLight.x = this.sophia.x - this.cameras.main.scrollX;
+    this.caveLight.y = this.sophia.y - this.cameras.main.scrollY;
   }
 
   followBehind(follower, leader, time, offset, label) {
@@ -497,9 +725,15 @@ class TopDownScene extends Phaser.Scene {
     const dy = leader.y - follower.y;
     const dist = Math.hypot(dx, dy);
     const moving = dist > RAT_GAP;
-    if (moving) {
-      follower.x += dx * RAT_LERP;
-      follower.y += dy * RAT_LERP;
+
+    if (dist > 500) {
+      follower.x = leader.x - 40 + Phaser.Math.Between(-15, 15);
+      follower.y = leader.y - 30 + Phaser.Math.Between(-10, 10);
+    } else if (moving) {
+      let lerp = RAT_LERP;
+      if (dist > 200) lerp = Math.min(0.25, RAT_LERP + (dist - 200) / 1200);
+      follower.x += dx * lerp;
+      follower.y += dy * lerp;
       if (dx > 0.3) follower.scaleX = 1;
       else if (dx < -0.3) follower.scaleX = -1;
       follower.scaleY = 1 + Math.sin(time / 80 + offset * 1.7) * 0.08;
@@ -533,7 +767,6 @@ class TopDownScene extends Phaser.Scene {
       duration: 260,
       ease: 'Back.easeOut'
     });
-
     this.tweens.add({
       targets: b,
       scale: 1.7,
@@ -606,7 +839,9 @@ class PeekScene extends Phaser.Scene {
     this.cameras.main.setBounds(-400, 0, 1600, 600);
     this.cameras.main.scrollX = 0;
 
-    this.buildWaterfallView();
+    if (this.spot === 'beach-sunset') this.buildSunsetView();
+    else this.buildWaterfallView();
+
     this.buildTouchZones();
     this.buildOverlayUI();
 
@@ -617,25 +852,21 @@ class PeekScene extends Phaser.Scene {
   buildWaterfallView() {
     this.add.rectangle(400, 100, 2400, 200, 0xb3e0ff).setScrollFactor(0);
     this.add.rectangle(400, 250, 2400, 100, 0xd4eeff).setScrollFactor(0);
-
     this.add.circle(620, 110, 50, 0xfff3a8, 0.35).setScrollFactor(0.05);
     this.add.circle(620, 110, 38, 0xfff3a8, 1).setScrollFactor(0.05);
     this.add.circle(615, 105, 22, 0xffffff, 0.7).setScrollFactor(0.05);
-
     for (let i = 0; i < 5; i++) {
       const cx = -200 + i * 350 + Phaser.Math.Between(-40, 40);
       const cy = 180 + Phaser.Math.Between(-20, 20);
       this.add.ellipse(cx, cy, 160, 40, 0xffffff, 0.85).setScrollFactor(0.08);
       this.add.ellipse(cx + 30, cy - 8, 100, 30, 0xffffff, 0.85).setScrollFactor(0.08);
     }
-
     for (let i = 0; i < 7; i++) {
       const mx = -300 + i * 230 + Phaser.Math.Between(-20, 20);
       const mh = Phaser.Math.Between(70, 140);
       this.add.triangle(mx, 290, 0, 0, 220, 0, 110, -mh, 0x6e8ca6).setScrollFactor(0.15);
       this.add.triangle(mx + 110, 290, 0, -mh, 70, -mh + 30, 110, 0, 0x8aa5bd, 0.7).setScrollFactor(0.15);
     }
-
     for (let i = 0; i < 11; i++) {
       const tx = -350 + i * 170 + Phaser.Math.Between(-30, 30);
       this.add.circle(tx, 330, Phaser.Math.Between(45, 75), 0x1a4d2e).setScrollFactor(0.3);
@@ -644,20 +875,17 @@ class PeekScene extends Phaser.Scene {
       const tx = -300 + i * 200 + Phaser.Math.Between(-30, 30);
       this.add.circle(tx, 340, Phaser.Math.Between(35, 60), 0x2e6d3a).setScrollFactor(0.4);
     }
-
     this.add.rectangle(400, 90, 300, 50, 0x6b4423).setScrollFactor(0.5);
     this.add.ellipse(290, 95, 70, 35, 0x4a2c1a).setScrollFactor(0.5);
     this.add.ellipse(510, 95, 70, 35, 0x4a2c1a).setScrollFactor(0.5);
     this.add.ellipse(360, 80, 90, 30, 0x8b5a2b).setScrollFactor(0.5);
     this.add.ellipse(440, 82, 90, 30, 0x8b5a2b).setScrollFactor(0.5);
-
     this.add.rectangle(400, 280, 220, 380, 0x4a90c8).setScrollFactor(0.5);
     this.add.rectangle(400, 280, 190, 380, 0x6fa8dc).setScrollFactor(0.5);
     this.add.rectangle(400, 280, 150, 380, 0xa3cef0, 0.6).setScrollFactor(0.5);
     this.add.rectangle(350, 280, 24, 380, 0xffffff, 0.45).setScrollFactor(0.5);
     this.add.rectangle(395, 280, 14, 380, 0xffffff, 0.35).setScrollFactor(0.5);
     this.add.rectangle(445, 280, 20, 380, 0xffffff, 0.4).setScrollFactor(0.5);
-
     for (let i = 0; i < 18; i++) {
       const d = this.add.rectangle(
         400 + Phaser.Math.Between(-95, 95),
@@ -668,7 +896,6 @@ class PeekScene extends Phaser.Scene {
       ).setScrollFactor(0.5);
       this.drops.push(d);
     }
-
     this.add.ellipse(400, 490, 520, 100, 0x2e6da4).setScrollFactor(0.5);
     this.add.ellipse(400, 488, 460, 80, 0x4a90c8).setScrollFactor(0.5);
     this.add.ellipse(400, 486, 360, 58, 0x6fa8dc, 0.75).setScrollFactor(0.5);
@@ -683,15 +910,12 @@ class PeekScene extends Phaser.Scene {
       const sy = 470 + Phaser.Math.Between(-8, 8);
       this.add.circle(sx, sy, Phaser.Math.Between(2, 5), 0xffffff, 0.9).setScrollFactor(0.5);
     }
-
     this.makeForegroundPalm(-80, 600);
     this.makeForegroundPalm(60, 600);
     this.makeForegroundPalm(740, 600);
     this.makeForegroundPalm(890, 600);
-
     this.add.rectangle(400, 580, 2400, 80, 0x267d3a).setScrollFactor(1);
     this.add.rectangle(400, 575, 2400, 50, 0x3a9c4a, 0.6).setScrollFactor(1);
-
     const flowerColors = [0xff5e7e, 0xffe066, 0xff8e3c, 0xb967ff, 0xff6b6b, 0xffffff, 0xff4081];
     for (let i = 0; i < 26; i++) {
       const fx = -350 + i * 55 + Phaser.Math.Between(-15, 15);
@@ -702,7 +926,6 @@ class PeekScene extends Phaser.Scene {
       this.add.circle(fx, fy, s, c).setScrollFactor(1);
       this.add.circle(fx, fy, s * 0.4, 0xffeb3b).setScrollFactor(1);
     }
-
     const bx = 250, by = 320;
     this.butterfly = this.add.container(bx, by);
     const wing1 = this.add.ellipse(-7, 0, 16, 22, 0xff8e3c);
@@ -715,6 +938,84 @@ class PeekScene extends Phaser.Scene {
     this.tweens.add({ targets: this.butterfly, y: by - 40, x: bx + 30, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.tweens.add({ targets: [wing1, wing3], scaleX: 0.3, duration: 180, yoyo: true, repeat: -1 });
     this.tweens.add({ targets: [wing2, wing4], scaleX: 0.3, duration: 180, yoyo: true, repeat: -1 });
+  }
+
+  buildSunsetView() {
+    this.add.rectangle(400, 60, 2400, 120, 0x4a148c).setScrollFactor(0);
+    this.add.rectangle(400, 130, 2400, 60, 0x7b1fa2).setScrollFactor(0);
+    this.add.rectangle(400, 180, 2400, 50, 0xc2185b).setScrollFactor(0);
+    this.add.rectangle(400, 225, 2400, 50, 0xef5350).setScrollFactor(0);
+    this.add.rectangle(400, 270, 2400, 40, 0xff7043).setScrollFactor(0);
+    this.add.rectangle(400, 305, 2400, 30, 0xff9800).setScrollFactor(0);
+    this.add.rectangle(400, 330, 2400, 20, 0xffb74d).setScrollFactor(0);
+
+    const sun = this.add.circle(400, 360, 130, 0xff5722, 1).setScrollFactor(0.1);
+    this.add.circle(400, 360, 160, 0xff7043, 0.5).setScrollFactor(0.1);
+    this.add.circle(400, 360, 200, 0xff9800, 0.25).setScrollFactor(0.1);
+    this.tweens.add({ targets: sun, scale: { from: 0.98, to: 1.04 }, duration: 4000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+
+    for (let i = 0; i < 4; i++) {
+      const cx = -200 + i * 380 + Phaser.Math.Between(-30, 30);
+      const cy = 100 + Phaser.Math.Between(-10, 20);
+      this.add.ellipse(cx, cy, 180, 22, 0xff7043, 0.6).setScrollFactor(0.08);
+      this.add.ellipse(cx + 30, cy + 5, 120, 16, 0xff9800, 0.55).setScrollFactor(0.08);
+    }
+    for (let i = 0; i < 3; i++) {
+      const cx = -100 + i * 500 + Phaser.Math.Between(-40, 40);
+      const cy = 230 + Phaser.Math.Between(-10, 10);
+      this.add.ellipse(cx, cy, 220, 14, 0xc62828, 0.55).setScrollFactor(0.05);
+    }
+
+    for (let i = 0; i < 5; i++) {
+      const ix = -300 + i * 280 + Phaser.Math.Between(-30, 30);
+      const w = Phaser.Math.Between(80, 140);
+      this.add.ellipse(ix, 410, w, 22, 0x311b4a).setScrollFactor(0.2);
+      this.add.ellipse(ix + 10, 405, w * 0.7, 14, 0x4a2c1a, 0.7).setScrollFactor(0.2);
+    }
+
+    this.add.rectangle(400, 460, 2400, 60, 0x1a237e).setScrollFactor(0.4);
+    this.add.rectangle(400, 440, 2400, 30, 0x303f9f).setScrollFactor(0.4);
+    this.add.rectangle(400, 480, 2400, 60, 0x0d47a1).setScrollFactor(0.4);
+    this.add.ellipse(400, 430, 360, 22, 0xff7043, 0.7).setScrollFactor(0.4);
+    this.add.ellipse(400, 445, 280, 14, 0xff9800, 0.6).setScrollFactor(0.4);
+    this.add.ellipse(400, 458, 200, 10, 0xffb74d, 0.5).setScrollFactor(0.4);
+    for (let i = 0; i < 14; i++) {
+      const x = -250 + i * 80 + Phaser.Math.Between(-20, 20);
+      const y = 430 + Phaser.Math.Between(0, 80);
+      const shimmer = this.add.ellipse(x, y, Phaser.Math.Between(20, 50), 5, 0xffffff, 0.6).setScrollFactor(0.4);
+      this.tweens.add({ targets: shimmer, alpha: { from: 0.6, to: 0.15 }, duration: 1800, yoyo: true, repeat: -1, delay: i * 130 });
+    }
+
+    for (let i = 0; i < 4; i++) {
+      const bx = -200 + i * 280 + Phaser.Math.Between(-60, 60);
+      const by = 180 + Phaser.Math.Between(0, 80);
+      const gull = this.add.graphics().setScrollFactor(0.25);
+      gull.lineStyle(2, 0x2a1a1a, 0.85);
+      gull.beginPath();
+      gull.moveTo(bx - 12, by);
+      gull.lineTo(bx - 6, by - 6);
+      gull.lineTo(bx, by - 2);
+      gull.lineTo(bx + 6, by - 6);
+      gull.lineTo(bx + 12, by);
+      gull.strokePath();
+      this.tweens.add({ targets: gull, x: '+=80', y: '+=20', duration: 6000 + i * 800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    }
+
+    this.add.rectangle(400, 540, 2400, 70, 0xf5deb3).setScrollFactor(1);
+    this.add.rectangle(400, 530, 2400, 30, 0xd4b483, 0.6).setScrollFactor(1);
+    for (let i = 0; i < 22; i++) {
+      const sx = -350 + i * 60 + Phaser.Math.Between(-12, 12);
+      const sy = 545 + Phaser.Math.Between(-8, 14);
+      this.add.circle(sx, sy, 2, 0xb8a17c, 0.7).setScrollFactor(1);
+    }
+    this.add.ellipse(180, 555, 24, 12, 0xffe0d0).setScrollFactor(1).setRotation(0.4);
+    this.add.ellipse(540, 565, 18, 9, 0xffd0c0).setScrollFactor(1).setRotation(-0.3);
+    this.add.ellipse(820, 552, 22, 11, 0xffe4d0).setScrollFactor(1).setRotation(0.6);
+
+    this.makeForegroundPalmSilhouette(-50, 600);
+    this.makeForegroundPalmSilhouette(110, 600);
+    this.makeForegroundPalmSilhouette(720, 600);
+    this.makeForegroundPalmSilhouette(880, 600);
   }
 
   makeForegroundPalm(x, y) {
@@ -730,6 +1031,17 @@ class PeekScene extends Phaser.Scene {
     this.add.circle(x - 8, y - 195, 9, 0x4a2c1a).setScrollFactor(0.9);
     this.add.circle(x + 8, y - 200, 9, 0x4a2c1a).setScrollFactor(0.9);
     this.add.circle(x, y - 188, 9, 0x4a2c1a).setScrollFactor(0.9);
+  }
+
+  makeForegroundPalmSilhouette(x, y) {
+    this.add.rectangle(x, y, 30, 240, 0x1a0d1f).setOrigin(0.5, 1).setScrollFactor(0.9);
+    this.add.ellipse(x - 55, y - 220, 150, 38, 0x14081a).setScrollFactor(0.9).setRotation(0.18);
+    this.add.ellipse(x + 55, y - 220, 150, 38, 0x14081a).setScrollFactor(0.9).setRotation(-0.18);
+    this.add.ellipse(x, y - 255, 55, 150, 0x14081a).setScrollFactor(0.9);
+    this.add.ellipse(x - 80, y - 240, 80, 25, 0x14081a).setScrollFactor(0.9).setRotation(0.55);
+    this.add.ellipse(x + 80, y - 240, 80, 25, 0x14081a).setScrollFactor(0.9).setRotation(-0.55);
+    this.add.ellipse(x - 60, y - 200, 70, 20, 0x14081a).setScrollFactor(0.9).setRotation(0.3);
+    this.add.ellipse(x + 60, y - 200, 70, 20, 0x14081a).setScrollFactor(0.9).setRotation(-0.3);
   }
 
   buildTouchZones() {
@@ -754,7 +1066,6 @@ class PeekScene extends Phaser.Scene {
       stroke: '#000000',
       strokeThickness: 3
     }).setOrigin(0.5, 0.5).setScrollFactor(0);
-
     const backBg = this.add.rectangle(60, 50, 96, 50, 0xffeb3b, 0.95).setScrollFactor(0).setStrokeStyle(3, 0x8b5a2b);
     const backTxt = this.add.text(60, 50, 'BACK', {
       fontFamily: 'Comic Sans MS, Chalkboard SE, system-ui, sans-serif',
