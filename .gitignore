@@ -1,0 +1,5 @@
+node_modules/
+*.backup.js
+Thumbs.db
+.DS_Store
+.claude/
