@@ -4,7 +4,7 @@ const RAT_LERP = 0.08;
 const WORLD_W = 2400;
 const WORLD_H = 1800;
 const CAVE_CENTER = { x: 2000, y: 280 };
-const CAVE_DIM_RADIUS = 320;
+const CAVE_DIM_RADIUS = 380;
 
 const PEEK_SPOTS = [
   { id: 'waterfall',    x: 1500, y: 1030 },
@@ -23,6 +23,48 @@ const BANANA_SPOTS = [
   { x: 1300, y: 1380 },
   { x: 2100, y: 1450 }
 ];
+
+const SCENERY_LABELS = [
+  { x: 1500, y: 1000, text: 'waterfall' },
+  { x: 300,  y: 870,  text: 'bridge' },
+  { x: 300,  y: 1100, text: 'river' },
+  { x: 2000, y: 370,  text: 'cave' },
+  { x: 500,  y: 1480, text: 'beach' },
+  { x: 1200, y: 510,  text: 'tall tree' },
+  { x: 200,  y: 230,  text: 'forest' },
+  { x: 1820, y: 420,  text: 'boulder' },
+  { x: 820,  y: 1320, text: 'palm tree' },
+  { x: 1020, y: 850,  text: 'stump' },
+  { x: 1060, y: 530,  text: 'mushroom' },
+  { x: 1850, y: 700,  text: 'flower' }
+];
+
+const SNOWY_PHRASES = [
+  'I see a flower!',
+  'Look, water!',
+  'I am Snowy.',
+  'I see a tree.',
+  'I see the cave.',
+  'Look, a banana!',
+  'I like flowers.',
+  'I see the river.'
+];
+
+const MIDNIGHT_PHRASES = [
+  'I like bananas.',
+  'I see a tree.',
+  'I am Midnight.',
+  'Look, a stump!',
+  'I see the beach.',
+  'Look, a flower!',
+  'I like the cave.',
+  'I see a palm tree.'
+];
+
+const NUMBER_WORDS = ['none yet!', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+function numberWord(n) {
+  return n >= 0 && n < NUMBER_WORDS.length ? NUMBER_WORDS[n] : n.toString();
+}
 
 let audioCtx = null;
 function getAudioCtx() {
@@ -126,13 +168,37 @@ class TopDownScene extends Phaser.Scene {
 
     this.makeCounterUI();
 
-    this.caveDim = this.add.rectangle(400, 300, 800, 600, 0x05050f, 0)
+    this.sceneryLabels = SCENERY_LABELS.map(spec => {
+      const t = this.add.text(spec.x, spec.y, spec.text, {
+        fontFamily: 'Comic Sans MS, Chalkboard SE, system-ui, sans-serif',
+        fontSize: '22px',
+        color: '#ffffff',
+        stroke: '#000000',
+        strokeThickness: 4,
+        fontStyle: 'bold'
+      }).setOrigin(0.5, 1).setAlpha(0).setDepth(850);
+      return { x: spec.x, y: spec.y, text: t };
+    });
+
+    this.chatterActive = false;
+    this.lastChatterTime = 0;
+    this.nextChatterDelay = 20000 + Math.random() * 20000;
+    this.activeBubble = null;
+
+    this.caveDim = this.add.rectangle(400, 300, 800, 600, 0x080820)
+      .setAlpha(0)
       .setScrollFactor(0)
       .setDepth(800);
-    this.caveLight = this.add.circle(400, 300, 140, 0xffe082, 0)
+    this.caveLight = this.add.circle(400, 300, 160, 0xffe082)
+      .setAlpha(0)
       .setScrollFactor(0)
       .setDepth(801);
     this.caveLight.setBlendMode(Phaser.BlendModes.ADD);
+    this.caveLightCore = this.add.circle(400, 300, 70, 0xfff9c4)
+      .setAlpha(0)
+      .setScrollFactor(0)
+      .setDepth(802);
+    this.caveLightCore.setBlendMode(Phaser.BlendModes.ADD);
 
     this.cameras.main.startFollow(this.sophia, true, 0.12, 0.12);
 
@@ -504,16 +570,16 @@ class TopDownScene extends Phaser.Scene {
   }
 
   makeCounterUI() {
-    this.add.rectangle(78, 32, 132, 50, 0x000000, 0.55)
+    this.add.rectangle(140, 32, 264, 52, 0x000000, 0.6)
       .setStrokeStyle(3, 0xffeb3b, 0.9)
       .setOrigin(0.5, 0.5)
       .setScrollFactor(0)
       .setDepth(1000);
     const iconG = this.add.graphics().setScrollFactor(0).setDepth(1000);
-    iconG.x = 38; iconG.y = 32;
+    iconG.x = 30; iconG.y = 32;
     this.drawBananaShape(iconG, 0.95);
     const count = this.registry.get('bananaCount');
-    this.bananaText = this.add.text(60, 32, '× ' + count, {
+    this.bananaText = this.add.text(54, 32, '× ' + count, {
       fontFamily: 'Comic Sans MS, Chalkboard SE, system-ui, sans-serif',
       fontSize: '26px',
       color: '#ffffff',
@@ -521,6 +587,15 @@ class TopDownScene extends Phaser.Scene {
       strokeThickness: 4,
       fontStyle: 'bold'
     }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(1000);
+    this.bananaWordText = this.add.text(0, 34, '(' + numberWord(count) + ')', {
+      fontFamily: 'Comic Sans MS, Chalkboard SE, system-ui, sans-serif',
+      fontSize: '15px',
+      color: '#ffe082',
+      stroke: '#000000',
+      strokeThickness: 3,
+      fontStyle: 'italic'
+    }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(1000);
+    this.bananaWordText.x = this.bananaText.x + this.bananaText.width + 6;
   }
 
   drawBananaShape(g, scale) {
@@ -706,7 +781,7 @@ class TopDownScene extends Phaser.Scene {
       const b = this.bananas[i];
       b.y = b.baseY + Math.sin(time / 400 + b.bobOffset) * 3;
       const d = Phaser.Math.Distance.Between(this.sophia.x, this.sophia.y, b.x, b.y);
-      if (d < 26) {
+      if (d < 24) {
         this.collectBanana(b);
         this.bananas.splice(i, 1);
       }
@@ -714,10 +789,37 @@ class TopDownScene extends Phaser.Scene {
 
     const cd = Phaser.Math.Distance.Between(this.sophia.x, this.sophia.y, CAVE_CENTER.x, CAVE_CENTER.y);
     const darkness = Phaser.Math.Clamp(1 - cd / CAVE_DIM_RADIUS, 0, 1);
-    this.caveDim.alpha = darkness * 0.85;
-    this.caveLight.alpha = darkness * 0.95;
-    this.caveLight.x = this.sophia.x - this.cameras.main.scrollX;
-    this.caveLight.y = this.sophia.y - this.cameras.main.scrollY;
+    this.caveDim.alpha = darkness * 0.7;
+    this.caveLight.alpha = darkness * 0.45;
+    this.caveLightCore.alpha = darkness * 0.4;
+    const lx = this.sophia.x - this.cameras.main.scrollX;
+    const ly = this.sophia.y - this.cameras.main.scrollY;
+    this.caveLight.x = lx; this.caveLight.y = ly;
+    this.caveLightCore.x = lx; this.caveLightCore.y = ly;
+
+    for (const lbl of this.sceneryLabels) {
+      const ddx = lbl.x - this.sophia.x;
+      const ddy = lbl.y - this.sophia.y;
+      const ld = Math.hypot(ddx, ddy);
+      const target = ld < 70 ? 1 : 0;
+      lbl.text.alpha += (target - lbl.text.alpha) * 0.15;
+    }
+
+    if (!this.chatterActive && time - this.lastChatterTime > this.nextChatterDelay) {
+      const candidates = [];
+      if (this.snowyMoving) candidates.push({ rat: this.snowy, phrases: SNOWY_PHRASES });
+      if (this.midnightMoving) candidates.push({ rat: this.midnight, phrases: MIDNIGHT_PHRASES });
+      if (candidates.length > 0) {
+        const c = Phaser.Math.RND.pick(candidates);
+        this.showChatter(c.rat, Phaser.Math.RND.pick(c.phrases));
+        this.lastChatterTime = time;
+        this.nextChatterDelay = 20000 + Math.random() * 20000;
+      }
+    }
+    if (this.activeBubble) {
+      this.activeBubble.container.x = this.activeBubble.rat.x;
+      this.activeBubble.container.y = this.activeBubble.rat.y - 38;
+    }
   }
 
   followBehind(follower, leader, time, offset, label) {
@@ -760,10 +862,18 @@ class TopDownScene extends Phaser.Scene {
     const count = this.registry.get('bananaCount') + 1;
     this.registry.set('bananaCount', count);
     this.bananaText.setText('× ' + count);
+    this.bananaWordText.setText('(' + numberWord(count) + ')');
+    this.bananaWordText.x = this.bananaText.x + this.bananaText.width + 6;
 
     this.tweens.add({
       targets: this.bananaText,
       scale: { from: 1.5, to: 1 },
+      duration: 260,
+      ease: 'Back.easeOut'
+    });
+    this.tweens.add({
+      targets: this.bananaWordText,
+      scale: { from: 1.4, to: 1 },
       duration: 260,
       ease: 'Back.easeOut'
     });
@@ -775,6 +885,63 @@ class TopDownScene extends Phaser.Scene {
       duration: 280,
       ease: 'Cubic.easeOut',
       onComplete: () => b.destroy()
+    });
+  }
+
+  showChatter(rat, text) {
+    this.chatterActive = true;
+    const c = this.add.container(rat.x, rat.y - 38);
+    c.setDepth(900);
+
+    const t = this.add.text(0, 0, text, {
+      fontFamily: 'Comic Sans MS, Chalkboard SE, system-ui, sans-serif',
+      fontSize: '14px',
+      color: '#2a2a2a',
+      fontStyle: 'bold'
+    }).setOrigin(0.5, 0.5);
+
+    const padX = 8, padY = 4;
+    const bg = this.add.rectangle(0, 0, t.width + padX * 2, t.height + padY * 2, 0xffffff, 0.95)
+      .setStrokeStyle(2, 0x333333);
+
+    const ty = t.height / 2 + padY;
+    const tail = this.add.graphics();
+    tail.fillStyle(0xffffff, 0.95);
+    tail.fillTriangle(-6, ty, 6, ty, 0, ty + 9);
+    tail.lineStyle(2, 0x333333);
+    tail.beginPath();
+    tail.moveTo(-6, ty);
+    tail.lineTo(0, ty + 9);
+    tail.lineTo(6, ty);
+    tail.strokePath();
+
+    c.add([bg, tail, t]);
+    c.alpha = 0;
+    c.setScale(0.7);
+
+    this.tweens.add({
+      targets: c,
+      alpha: 1,
+      scale: 1,
+      duration: 220,
+      ease: 'Back.easeOut'
+    });
+
+    this.activeBubble = { container: c, rat };
+
+    this.time.delayedCall(3000, () => {
+      if (!c.active) return;
+      this.tweens.add({
+        targets: c,
+        alpha: 0,
+        scale: 0.8,
+        duration: 350,
+        onComplete: () => {
+          c.destroy();
+          this.activeBubble = null;
+          this.chatterActive = false;
+        }
+      });
     });
   }
 
