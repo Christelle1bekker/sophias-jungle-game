@@ -66,6 +66,104 @@ function numberWord(n) {
   return n >= 0 && n < NUMBER_WORDS.length ? NUMBER_WORDS[n] : n.toString();
 }
 
+const FLOWER_PUZZLE = {
+  center: { x: 1100, y: 320 },
+  resetRadius: 520,
+  interactRadius: 50,
+  pedestals: [
+    { id: 'red',    x: 970,  y: 410, color: 0xe53935, label: 'red' },
+    { id: 'blue',   x: 1100, y: 410, color: 0x1976d2, label: 'blue' },
+    { id: 'yellow', x: 1230, y: 410, color: 0xfdd835, label: 'yellow' }
+  ],
+  slots: [
+    { id: 'blue',   x: 970,  y: 230, color: 0x1976d2, label: 'blue' },
+    { id: 'yellow', x: 1100, y: 230, color: 0xfdd835, label: 'yellow' },
+    { id: 'red',    x: 1230, y: 230, color: 0xe53935, label: 'red' }
+  ]
+};
+
+const BRIDGE_HOOK_RADIUS = 110;
+const BRIDGE_HOOK_DISMISS_RADIUS = 170;
+
+const SAVE_KEY = 'sophias-rat-jungle-save';
+const DEFAULT_SAVE_STATE = {
+  version: 1,
+  bananaCount: 0,
+  bananasCollected: [],
+  puzzlesSolved: {
+    colourMatch: false,
+    counting: false,
+    memory: false,
+    pattern: false,
+    wordSpell: false
+  },
+  actsUnlocked: {
+    act1: true,
+    act2: false,
+    act3: false,
+    act4: false,
+    act5: false
+  },
+  partyItems: {
+    bananas: 0,
+    flowers: 0,
+    stones: 0,
+    musicNotes: 0,
+    goldenBanana: false
+  },
+  stats: {
+    startedAt: null,
+    lastPlayedAt: null,
+    gameCompleted: false
+  }
+};
+
+const SaveManager = {
+  _inMemory: null,
+  _cloneDefault() {
+    return JSON.parse(JSON.stringify(DEFAULT_SAVE_STATE));
+  },
+  load() {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) {
+        if (this._inMemory) return this._inMemory;
+        return this._cloneDefault();
+      }
+      const parsed = JSON.parse(raw);
+      const fresh = this._cloneDefault();
+      return Object.assign(fresh, parsed, {
+        puzzlesSolved: Object.assign(fresh.puzzlesSolved, parsed.puzzlesSolved || {}),
+        actsUnlocked: Object.assign(fresh.actsUnlocked, parsed.actsUnlocked || {}),
+        partyItems: Object.assign(fresh.partyItems, parsed.partyItems || {}),
+        stats: Object.assign(fresh.stats, parsed.stats || {})
+      });
+    } catch (e) {
+      if (!this._inMemory) this._inMemory = this._cloneDefault();
+      return this._inMemory;
+    }
+  },
+  save(state) {
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+    } catch (e) {
+      this._inMemory = state;
+    }
+  },
+  reset() {
+    try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+    this._inMemory = null;
+  },
+  isFirstPlay() {
+    try {
+      return localStorage.getItem(SAVE_KEY) === null;
+    } catch (e) {
+      return this._inMemory === null;
+    }
+  }
+};
+window.SaveManager = SaveManager;
+
 let audioCtx = null;
 function getAudioCtx() {
   if (!audioCtx) {
@@ -115,6 +213,42 @@ function playPickup() {
   });
 }
 
+function playFanfare() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+  notes.forEach((f, i) => {
+    const t = ctx.currentTime + i * 0.1;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = f;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.2, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.32);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.34);
+  });
+}
+
+function playWrong() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sawtooth';
+  const t = ctx.currentTime;
+  osc.frequency.setValueAtTime(220, t);
+  osc.frequency.exponentialRampToValueAtTime(110, t + 0.2);
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.06, t + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(t);
+  osc.stop(t + 0.25);
+}
+
 class TopDownScene extends Phaser.Scene {
   constructor() { super('TopDown'); }
 
@@ -127,8 +261,18 @@ class TopDownScene extends Phaser.Scene {
     this.snowyMoving = false;
     this.midnightMoving = false;
 
-    if (!this.registry.has('collectedBananas')) this.registry.set('collectedBananas', []);
-    if (!this.registry.has('bananaCount')) this.registry.set('bananaCount', 0);
+    const save = SaveManager.load();
+    const now = new Date().toISOString();
+    if (save.stats.startedAt === null) save.stats.startedAt = now;
+    save.stats.lastPlayedAt = now;
+    SaveManager.save(save);
+
+    if (!this.registry.has('collectedBananas')) {
+      this.registry.set('collectedBananas', save.bananasCollected.slice());
+    }
+    if (!this.registry.has('bananaCount')) {
+      this.registry.set('bananaCount', save.bananaCount);
+    }
 
     this.cameras.main.setBounds(0, 0, WORLD_W, WORLD_H);
 
@@ -184,6 +328,29 @@ class TopDownScene extends Phaser.Scene {
     this.lastChatterTime = 0;
     this.nextChatterDelay = 20000 + Math.random() * 20000;
     this.activeBubble = null;
+
+    this.puzzle = {
+      pedestalNodes: [],
+      slotNodes: [],
+      slotFilled: {},
+      carrying: null,
+      carryFlower: null,
+      solved: false,
+      rewardSpawned: false
+    };
+    this.buildFlowerPuzzle();
+
+    this.spaceHint = this.add.text(0, 0, '↑ SPACE', {
+      fontFamily: 'Comic Sans MS, Chalkboard SE, system-ui, sans-serif',
+      fontSize: '18px',
+      color: '#ffeb3b',
+      stroke: '#000000',
+      strokeThickness: 4,
+      fontStyle: 'bold'
+    }).setOrigin(0.5, 1).setAlpha(0).setDepth(860);
+
+    this.sophiaThought = null;
+    this.bridgeHookActive = false;
 
     this.caveDim = this.add.rectangle(400, 300, 800, 600, 0x080820)
       .setAlpha(0)
@@ -773,8 +940,62 @@ class TopDownScene extends Phaser.Scene {
       m.dot.setFillStyle(0xffffaa, 1);
     }
     if (nearest) nearest.dot.setFillStyle(0xffffff, 1);
-    if (nearest && Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
-      this.enterPeek(nearest.id, nearest.x, nearest.y);
+
+    let puzzleInteract = null;
+    const pir = FLOWER_PUZZLE.interactRadius;
+    if (this.puzzle.carrying) {
+      for (const slot of this.puzzle.slotNodes) {
+        if (slot.filledFlower) continue;
+        const d = Phaser.Math.Distance.Between(this.sophia.x, this.sophia.y, slot.spec.x, slot.spec.y);
+        if (d < pir) { puzzleInteract = { kind: 'slot', node: slot }; break; }
+      }
+    } else {
+      for (const ped of this.puzzle.pedestalNodes) {
+        if (ped.picked) continue;
+        const d = Phaser.Math.Distance.Between(this.sophia.x, this.sophia.y, ped.spec.x, ped.spec.y);
+        if (d < pir) { puzzleInteract = { kind: 'ped', node: ped }; break; }
+      }
+    }
+
+    if (puzzleInteract) {
+      this.spaceHint.x = this.sophia.x;
+      this.spaceHint.y = this.sophia.y - 48;
+      this.spaceHint.alpha += (1 - this.spaceHint.alpha) * 0.2;
+    } else {
+      this.spaceHint.alpha += (0 - this.spaceHint.alpha) * 0.2;
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+      if (nearest) {
+        this.enterPeek(nearest.id, nearest.x, nearest.y);
+      } else if (puzzleInteract) {
+        if (puzzleInteract.kind === 'ped') this.pickupFlower(puzzleInteract.node);
+        else this.dropFlower(puzzleInteract.node);
+      }
+    }
+
+    if (this.puzzle.carryFlower) {
+      this.puzzle.carryFlower.x = this.sophia.x;
+      this.puzzle.carryFlower.y = this.sophia.y - 40 + Math.sin(time / 200) * 2;
+    }
+
+    if (this.puzzle.solved || this.puzzle.carrying || this.puzzle.pedestalNodes.some(p => p.picked)) {
+      const dpc = Phaser.Math.Distance.Between(this.sophia.x, this.sophia.y, FLOWER_PUZZLE.center.x, FLOWER_PUZZLE.center.y);
+      if (dpc > FLOWER_PUZZLE.resetRadius) this.resetPuzzle();
+    }
+
+    const bd = Phaser.Math.Distance.Between(this.sophia.x, this.sophia.y, this.bridgeHookSpot.x, this.bridgeHookSpot.y);
+    if (bd < BRIDGE_HOOK_RADIUS && !this.bridgeHookActive) {
+      this.bridgeHookActive = true;
+      this.showSophiaThought('I need 3 bananas.');
+    }
+    if (this.bridgeHookActive && bd > BRIDGE_HOOK_DISMISS_RADIUS) {
+      this.bridgeHookActive = false;
+      this.dismissSophiaThought();
+    }
+    if (this.sophiaThought) {
+      this.sophiaThought.x = this.sophia.x;
+      this.sophiaThought.y = this.sophia.y - 55;
     }
 
     for (let i = this.bananas.length - 1; i >= 0; i--) {
@@ -818,7 +1039,7 @@ class TopDownScene extends Phaser.Scene {
     }
     if (this.activeBubble) {
       this.activeBubble.container.x = this.activeBubble.rat.x;
-      this.activeBubble.container.y = this.activeBubble.rat.y - 38;
+      this.activeBubble.container.y = this.activeBubble.rat.y - 55;
     }
   }
 
@@ -854,6 +1075,21 @@ class TopDownScene extends Phaser.Scene {
     label.alpha += (target - label.alpha) * 0.15;
   }
 
+  saveProgress() {
+    const save = SaveManager.load();
+    save.bananaCount = this.registry.get('bananaCount');
+    save.bananasCollected = this.registry.get('collectedBananas').slice();
+    SaveManager.save(save);
+  }
+
+  markPuzzleSolved(name) {
+    const save = SaveManager.load();
+    if (save.puzzlesSolved.hasOwnProperty(name)) {
+      save.puzzlesSolved[name] = true;
+      SaveManager.save(save);
+    }
+  }
+
   collectBanana(b) {
     playPickup();
     const collected = this.registry.get('collectedBananas');
@@ -861,6 +1097,7 @@ class TopDownScene extends Phaser.Scene {
     this.registry.set('collectedBananas', collected);
     const count = this.registry.get('bananaCount') + 1;
     this.registry.set('bananaCount', count);
+    this.saveProgress();
     this.bananaText.setText('× ' + count);
     this.bananaWordText.setText('(' + numberWord(count) + ')');
     this.bananaWordText.x = this.bananaText.x + this.bananaText.width + 6;
@@ -890,7 +1127,7 @@ class TopDownScene extends Phaser.Scene {
 
   showChatter(rat, text) {
     this.chatterActive = true;
-    const c = this.add.container(rat.x, rat.y - 38);
+    const c = this.add.container(rat.x, rat.y - 55);
     c.setDepth(900);
 
     const t = this.add.text(0, 0, text, {
@@ -942,6 +1179,246 @@ class TopDownScene extends Phaser.Scene {
           this.chatterActive = false;
         }
       });
+    });
+  }
+
+  buildFlowerPuzzle() {
+    for (const ped of FLOWER_PUZZLE.pedestals) {
+      this.puzzle.pedestalNodes.push(this.makePedestal(ped));
+    }
+    for (const slot of FLOWER_PUZZLE.slots) {
+      this.puzzle.slotNodes.push(this.makeSlot(slot));
+      this.puzzle.slotFilled[slot.id] = null;
+    }
+  }
+
+  makePedestal(spec) {
+    this.add.ellipse(spec.x, spec.y + 28, 36, 10, 0x000000, 0.3);
+    this.add.rectangle(spec.x, spec.y + 12, 22, 40, 0x6a6a6a).setOrigin(0.5, 0.5);
+    this.add.rectangle(spec.x - 7, spec.y + 12, 5, 40, 0x4a4a4a);
+    this.add.rectangle(spec.x + 7, spec.y + 12, 5, 40, 0x8a8a8a);
+    this.add.ellipse(spec.x, spec.y - 6, 32, 12, 0x9a9a9a);
+    this.add.ellipse(spec.x, spec.y - 8, 28, 10, 0xababab);
+    const glow = this.add.circle(spec.x, spec.y - 14, 22, spec.color, 0.3);
+    const flower = this.add.container(spec.x, spec.y - 14);
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      flower.add(this.add.circle(Math.cos(a) * 7, Math.sin(a) * 7, 6, spec.color));
+    }
+    flower.add(this.add.circle(0, 0, 5, 0xffeb3b));
+    flower.add(this.add.circle(0, 0, 2, 0xff8e3c));
+    this.tweens.add({ targets: flower, y: spec.y - 18, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: glow, alpha: { from: 0.25, to: 0.6 }, duration: 1400, yoyo: true, repeat: -1 });
+    this.solids.push({ x: spec.x, y: spec.y + 12, w: 22, h: 40 });
+    return { spec, flower, glow, picked: false };
+  }
+
+  makeSlot(spec) {
+    this.add.ellipse(spec.x, spec.y + 10, 40, 8, 0x000000, 0.3);
+    this.add.ellipse(spec.x, spec.y + 6, 40, 12, 0x4a2c1a);
+    this.add.ellipse(spec.x, spec.y + 4, 38, 10, 0x6b4423);
+    this.add.ellipse(spec.x, spec.y + 3, 32, 8, 0x8b5a2b);
+    const ring = this.add.circle(spec.x, spec.y - 4, 14, spec.color, 0)
+      .setStrokeStyle(3, spec.color, 0.95);
+    const inner = this.add.circle(spec.x, spec.y - 4, 10, spec.color, 0.15);
+    const labelColor = spec.id === 'red' ? '#e53935'
+                     : spec.id === 'blue' ? '#1976d2' : '#fdd835';
+    const text = this.add.text(spec.x, spec.y + 26, spec.label, {
+      fontFamily: 'Comic Sans MS, Chalkboard SE, system-ui, sans-serif',
+      fontSize: '18px',
+      color: labelColor,
+      stroke: '#000000',
+      strokeThickness: 3,
+      fontStyle: 'bold'
+    }).setOrigin(0.5, 0);
+    return { spec, ring, inner, text, filledFlower: null };
+  }
+
+  makeCarryFlower(color) {
+    const c = this.add.container(0, 0);
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      c.add(this.add.circle(Math.cos(a) * 7, Math.sin(a) * 7, 6, color));
+    }
+    c.add(this.add.circle(0, 0, 5, 0xffeb3b));
+    c.add(this.add.circle(0, 0, 2, 0xff8e3c));
+    c.setDepth(700);
+    return c;
+  }
+
+  pickupFlower(pedestal) {
+    if (this.puzzle.carrying) return;
+    if (pedestal.picked) return;
+    pedestal.picked = true;
+    this.tweens.add({
+      targets: [pedestal.flower, pedestal.glow],
+      alpha: 0,
+      scale: 0.5,
+      duration: 220
+    });
+    this.puzzle.carrying = pedestal.spec.id;
+    this.puzzle.carryFlower = this.makeCarryFlower(pedestal.spec.color);
+    this.puzzle.carryFlower.x = this.sophia.x;
+    this.puzzle.carryFlower.y = this.sophia.y - 40;
+    this.puzzle.carryFlower.alpha = 0;
+    this.puzzle.carryFlower.setScale(0.7);
+    this.tweens.add({
+      targets: this.puzzle.carryFlower,
+      alpha: 1,
+      scale: 1,
+      duration: 250,
+      ease: 'Back.easeOut'
+    });
+    playPickup();
+  }
+
+  dropFlower(slot) {
+    if (!this.puzzle.carrying) return;
+    if (slot.filledFlower) return;
+    const correct = (this.puzzle.carrying === slot.spec.id);
+    if (correct) {
+      const cf = this.puzzle.carryFlower;
+      this.tweens.add({
+        targets: cf,
+        x: slot.spec.x,
+        y: slot.spec.y - 4,
+        scale: 0.85,
+        duration: 280,
+        ease: 'Cubic.easeOut'
+      });
+      slot.filledFlower = cf;
+      this.puzzle.slotFilled[slot.spec.id] = this.puzzle.carrying;
+      this.puzzle.carrying = null;
+      this.puzzle.carryFlower = null;
+      playPickup();
+      this.checkPuzzleWin();
+    } else {
+      this.tweens.add({
+        targets: slot.ring,
+        x: { from: slot.spec.x - 6, to: slot.spec.x + 6 },
+        duration: 60,
+        yoyo: true,
+        repeat: 4,
+        onComplete: () => { slot.ring.x = slot.spec.x; }
+      });
+      this.tweens.add({
+        targets: slot.inner,
+        alpha: { from: 0.5, to: 0.15 },
+        duration: 400
+      });
+      this.tweens.add({
+        targets: this.puzzle.carryFlower,
+        scale: { from: 1.25, to: 1 },
+        duration: 200
+      });
+      playWrong();
+    }
+  }
+
+  checkPuzzleWin() {
+    const all = Object.values(this.puzzle.slotFilled).every(v => v !== null);
+    if (all && !this.puzzle.solved) {
+      this.puzzle.solved = true;
+      this.markPuzzleSolved('colourMatch');
+      playFanfare();
+      const cx = FLOWER_PUZZLE.center.x, cy = FLOWER_PUZZLE.center.y;
+      for (let i = 0; i < 24; i++) {
+        const a = (i / 24) * Math.PI * 2;
+        const star = this.add.star(cx, cy, 5, 5, 14, 0xffeb3b).setDepth(700);
+        this.tweens.add({
+          targets: star,
+          x: cx + Math.cos(a) * 160,
+          y: cy + Math.sin(a) * 120,
+          scale: { from: 1.2, to: 0 },
+          alpha: { from: 1, to: 0 },
+          angle: 360,
+          duration: 900,
+          ease: 'Cubic.easeOut',
+          onComplete: () => star.destroy()
+        });
+      }
+      if (!this.puzzle.rewardSpawned) {
+        this.puzzle.rewardSpawned = true;
+        const rewardId = 1000 + Math.floor(Math.random() * 9000);
+        const banana = this.makeBanana(cx, cy, rewardId);
+        banana.alpha = 0;
+        banana.setScale(0.4);
+        this.tweens.add({
+          targets: banana,
+          alpha: 1,
+          scale: 1,
+          duration: 500,
+          delay: 400,
+          ease: 'Back.easeOut'
+        });
+        this.bananas.push(banana);
+      }
+    }
+  }
+
+  resetPuzzle() {
+    for (const ped of this.puzzle.pedestalNodes) {
+      ped.picked = false;
+      ped.flower.alpha = 1;
+      ped.flower.setScale(1);
+      ped.glow.alpha = 0.3;
+      ped.glow.setScale(1);
+    }
+    for (const slot of this.puzzle.slotNodes) {
+      if (slot.filledFlower) {
+        slot.filledFlower.destroy();
+        slot.filledFlower = null;
+      }
+      this.puzzle.slotFilled[slot.spec.id] = null;
+    }
+    if (this.puzzle.carryFlower) {
+      this.puzzle.carryFlower.destroy();
+      this.puzzle.carryFlower = null;
+    }
+    this.puzzle.carrying = null;
+    this.puzzle.solved = false;
+    this.puzzle.rewardSpawned = false;
+  }
+
+  showSophiaThought(text) {
+    if (this.sophiaThought) return;
+    const c = this.add.container(this.sophia.x, this.sophia.y - 55);
+    c.setDepth(900);
+    const t = this.add.text(0, 0, text, {
+      fontFamily: 'Comic Sans MS, Chalkboard SE, system-ui, sans-serif',
+      fontSize: '15px',
+      color: '#2a2a2a',
+      fontStyle: 'bold'
+    }).setOrigin(0.5, 0.5);
+    const padX = 10, padY = 5;
+    const bg = this.add.rectangle(0, 0, t.width + padX * 2, t.height + padY * 2, 0xffffff, 0.95)
+      .setStrokeStyle(2, 0x333333);
+    const tailY = t.height / 2 + padY + 6;
+    const cloud1 = this.add.circle(-5, tailY, 4, 0xffffff, 0.95).setStrokeStyle(1.5, 0x333333);
+    const cloud2 = this.add.circle(2, tailY + 5, 3, 0xffffff, 0.95).setStrokeStyle(1.5, 0x333333);
+    c.add([bg, cloud1, cloud2, t]);
+    c.alpha = 0;
+    c.setScale(0.7);
+    this.tweens.add({
+      targets: c,
+      alpha: 1,
+      scale: 1,
+      duration: 220,
+      ease: 'Back.easeOut'
+    });
+    this.sophiaThought = c;
+  }
+
+  dismissSophiaThought() {
+    if (!this.sophiaThought) return;
+    const c = this.sophiaThought;
+    this.sophiaThought = null;
+    this.tweens.add({
+      targets: c,
+      alpha: 0,
+      scale: 0.8,
+      duration: 250,
+      onComplete: () => c.destroy()
     });
   }
 
