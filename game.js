@@ -103,11 +103,11 @@ function numberWord(n) {
 }
 
 const STOP_MARKERS = [
-  { id: 'snowy',  x: 1080, y: 800,  animal: 'rat',    color: 0x6b4423, displayName: 'Snowy',  puzzleKey: 'sumBridge',    prereq: null,     placeholder: "Snowy is being shy this week, she'll come out next time! 🐀" },
-  { id: 'crab',   x: 1200, y: 1500, animal: 'crab',   color: 0xef5350, displayName: 'Crab',   puzzleKey: 'wordTree',     prereq: 'snowy',  placeholder: "The crab is hiding in the sand. Come back soon! 🦀" },
-  { id: 'snake',  x: 1200, y: 590,  animal: 'snake',  color: 0x66bb6a, displayName: 'Snake',  puzzleKey: 'snakeKnots',   prereq: 'crab',   placeholder: "The snake is napping in the leaves. Shhh! 🐍" },
-  { id: 'bat',    x: 2000, y: 380,  animal: 'bat',    color: 0x424242, displayName: 'Bat',    puzzleKey: 'batWing',      prereq: 'snake',  placeholder: "The bat is sleeping in the cave. Don't wake him! 🦇" },
-  { id: 'parrot', x: 400,  y: 200,  animal: 'parrot', color: 0x42a5f5, displayName: 'Parrot', puzzleKey: 'parrotStory',  prereq: 'bat',    placeholder: "The parrot is visiting friends far away. She'll be back! 🦜" }
+  { id: 'snowy',  x: 1080, y: 800,  animal: 'rat',    color: 0x6b4423, displayName: 'Snowy',  puzzleKey: 'sumBridge',    prereq: null,     placeholder: "🚧 Coming soon! Snowy's maths puzzle is being built." },
+  { id: 'crab',   x: 1200, y: 1500, animal: 'crab',   color: 0xef5350, displayName: 'Crab',   puzzleKey: 'wordTree',     prereq: 'snowy',  placeholder: "🚧 Coming soon! The crab's spelling puzzle is being built." },
+  { id: 'snake',  x: 1200, y: 590,  animal: 'snake',  color: 0x66bb6a, displayName: 'Snake',  puzzleKey: 'snakeKnots',   prereq: 'crab',   placeholder: "🚧 Coming soon! The snake's pattern puzzle is being built." },
+  { id: 'bat',    x: 2000, y: 380,  animal: 'bat',    color: 0x424242, displayName: 'Bat',    puzzleKey: 'batWing',      prereq: 'snake',  placeholder: "🚧 Coming soon! The bat's counting puzzle is being built." },
+  { id: 'parrot', x: 400,  y: 200,  animal: 'parrot', color: 0x42a5f5, displayName: 'Parrot', puzzleKey: 'parrotStory',  prereq: 'bat',    placeholder: "🚧 Coming soon! The parrot's story puzzle is being built." }
 ];
 
 const SAVE_KEY = 'sophias-rat-jungle-save';
