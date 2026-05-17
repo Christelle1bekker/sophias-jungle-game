@@ -110,6 +110,184 @@ const STOP_MARKERS = [
   { id: 'parrot', x: 400,  y: 200,  animal: 'parrot', color: 0x42a5f5, displayName: 'Parrot', puzzleKey: 'parrotStory',  prereq: 'bat',    placeholder: "🚧 Coming soon! The parrot's story puzzle is being built." }
 ];
 
+const MATHS_QUESTIONS_DEFAULT = [
+  { question: '80 - 70 = ?',  answers: [10, 20, 0, 100], correctIndex: 0 },
+  { question: '100 - 30 = ?', answers: [70, 60, 80, 90], correctIndex: 0 },
+  { question: '50 - 20 = ?',  answers: [30, 20, 40, 10], correctIndex: 0 },
+  { question: '90 - 40 = ?',  answers: [50, 40, 60, 30], correctIndex: 0 },
+  { question: '100, 90, 80, 70, 60, ?', answers: [50, 40, 30, 55], correctIndex: 0 },
+  { question: '80, 70, 60, 50, ?',      answers: [40, 30, 45, 50], correctIndex: 0 },
+  { question: '90, 80, 70, ?',          answers: [60, 50, 70, 65], correctIndex: 0 },
+  { question: '10, 20, 30, ?, 50, 60', answers: [40, 35, 45, 50], correctIndex: 0 },
+  { question: '?, 30, 40, 50, 60',     answers: [20, 10, 25, 15], correctIndex: 0 },
+  { question: '40, 50, ?, 70, 80',     answers: [60, 55, 65, 70], correctIndex: 0 },
+  { question: '40 + 30 = ?',  answers: [70, 60, 80, 50], correctIndex: 0 },
+  { question: '50 + 25 = ?',  answers: [75, 70, 80, 65], correctIndex: 0 },
+  { question: '20 + 60 = ?',  answers: [80, 70, 90, 60], correctIndex: 0 },
+  { question: '5 × 2 = ?',   answers: [10, 7, 12, 8],    correctIndex: 0 },
+  { question: '10 × 3 = ?',  answers: [30, 20, 40, 13],  correctIndex: 0 },
+  { question: '2 × 4 = ?',   answers: [8, 6, 10, 12],    correctIndex: 0 },
+  { question: '5 × 5 = ?',   answers: [25, 20, 30, 15],  correctIndex: 0 },
+  { question: '10 × 5 = ?',  answers: [50, 40, 60, 15],  correctIndex: 0 }
+];
+
+const SPELLING_QUESTIONS_DEFAULT = [
+  { question: 'Spell this: 🐟',  answers: ['fish',  'fihs',  'fsih',  'fush'],   correctIndex: 0 },
+  { question: 'Spell this: 🏖️',  answers: ['sand',  'snad',  'sadn',  'sahd'],   correctIndex: 0 },
+  { question: 'Spell this: 🌊',  answers: ['wave',  'wvae',  'wvea',  'waev'],   correctIndex: 0 },
+  { question: 'Spell this: 🦀',  answers: ['crab',  'cabr',  'crba',  'carb'],   correctIndex: 0 },
+  { question: 'Spell this: 🐚',  answers: ['shell', 'shel',  'shlel', 'shele'],  correctIndex: 0 },
+  { question: 'Spell this: 🏝️',  answers: ['beach', 'baech', 'bech',  'beech'],  correctIndex: 0 },
+  { question: 'Spell this: 🏊',  answers: ['swim',  'swmi',  'siwm',  'swiim'],  correctIndex: 0 },
+  { question: 'Spell this: 🐸',  answers: ['frog',  'frgo',  'fogr',  'frrg'],   correctIndex: 0 },
+  { question: 'Spell this: 🤸',  answers: ['jump',  'jmpu',  'jupm',  'jmup'],   correctIndex: 0 },
+  { question: 'Spell this: 👒',  answers: ['hat',   'aht',   'tah',   'hta'],    correctIndex: 0 },
+  { question: 'Spell this: 🐈',  answers: ['cat',   'cta',   'tca',   'act'],    correctIndex: 0 },
+  { question: 'Spell this: 🐕',  answers: ['dog',   'dgo',   'odg',   'gdo'],    correctIndex: 0 },
+  { question: 'Spell this: ☀️',  answers: ['sun',   'snu',   'usn',   'uns'],    correctIndex: 0 },
+  { question: 'Spell this: 🌳',  answers: ['tree',  'treee', 'tre',   'teer'],   correctIndex: 0 },
+  { question: 'Spell this: 🐦',  answers: ['bird',  'brid',  'bdri',  'birb'],   correctIndex: 0 }
+];
+
+const PATTERN_QUESTIONS_DEFAULT = [
+  { question: '🟢 🔵 🟢 🔵 🟢 ?',       answers: ['🔵', '🟢', '🔴', '⚫'],     correctIndex: 0 },
+  { question: '🌟 🌟 🌙 🌟 🌟 🌙 ?',     answers: ['🌟', '🌙', '☀️', '⭐'],     correctIndex: 0 },
+  { question: '🔺 🔵 🔺 🔵 🔺 ?',       answers: ['🔵', '🔺', '🟦', '🟨'],    correctIndex: 0 },
+  { question: 'A B A B A ?',         answers: ['B', 'A', 'C', 'D'],         correctIndex: 0 },
+  { question: '1 2 1 2 1 ?',         answers: ['2', '1', '3', '0'],         correctIndex: 0 },
+  { question: '🍎 🍌 🍎 🍌 🍎 ?',       answers: ['🍌', '🍎', '🍇', '🍊'],    correctIndex: 0 },
+  { question: '🐱 🐶 🐱 🐶 🐱 ?',       answers: ['🐶', '🐱', '🐰', '🐻'],    correctIndex: 0 },
+  { question: '▲ ● ▲ ● ▲ ?',         answers: ['●', '▲', '■', '★'],         correctIndex: 0 },
+  { question: 'Red Blue Red Blue Red ?', answers: ['Blue', 'Red', 'Green', 'Yellow'], correctIndex: 0 },
+  { question: '🟢 🟢 🔵 🟢 🟢 🔵 ?',     answers: ['🟢', '🔵', '🔴', '🟡'],     correctIndex: 0 },
+  { question: 'Big Small Big Small Big ?', answers: ['Small', 'Big', 'Tiny', 'Huge'], correctIndex: 0 },
+  { question: '1 1 2 1 1 2 ?',       answers: ['1', '2', '3', '0'],         correctIndex: 0 }
+];
+
+const COUNTING_QUESTIONS_DEFAULT = [
+  { question: 'How many butterflies? 🦋🦋🦋🦋🦋',     answers: [5, 4, 6, 3],   correctIndex: 0 },
+  { question: 'Count the bugs: 🐛🐛🐛🐛🐛🐛🐛',       answers: [7, 6, 8, 5],   correctIndex: 0 },
+  { question: 'Count the stars: ⭐⭐⭐⭐⭐⭐⭐⭐',       answers: [8, 7, 9, 10],  correctIndex: 0 },
+  { question: 'Count the leaves: 🍃🍃🍃🍃🍃🍃',       answers: [6, 5, 7, 4],   correctIndex: 0 },
+  { question: 'Count the flowers: 🌸🌸🌸🌸🌸🌸🌸🌸🌸', answers: [9, 8, 10, 7],  correctIndex: 0 },
+  { question: 'Count the rocks: 🪨🪨🪨🪨',           answers: [4, 3, 5, 6],   correctIndex: 0 },
+  { question: 'Count the snails: 🐌🐌🐌🐌🐌🐌🐌🐌🐌🐌', answers: [10, 9, 11, 8], correctIndex: 0 },
+  { question: 'Count the cherries: 🍒🍒🍒🍒🍒',       answers: [5, 4, 6, 3],   correctIndex: 0 },
+  { question: 'Count the fish: 🐟🐟🐟🐟🐟🐟🐟',       answers: [7, 6, 8, 5],   correctIndex: 0 },
+  { question: 'Count the apples: 🍎🍎🍎🍎🍎🍎🍎🍎',   answers: [8, 7, 9, 6],   correctIndex: 0 },
+  { question: 'Count the moons: 🌙🌙🌙',             answers: [3, 2, 4, 5],   correctIndex: 0 },
+  { question: 'Count the suns: ☀️☀️☀️☀️☀️☀️☀️☀️☀️☀️', answers: [10, 9, 11, 8], correctIndex: 0 }
+];
+
+const READING_QUESTIONS_DEFAULT = [
+  {
+    passage: 'Snowy is hungry. Midnight is sleepy.',
+    question: 'Who needs food?',
+    answers: ['Snowy', 'Midnight', 'Both', 'Neither'],
+    correctIndex: 0
+  },
+  {
+    passage: 'The crab lives by the sea. He has a sore claw.',
+    question: 'Where does the crab live?',
+    answers: ['By the sea', 'In a tree', 'In a cave', 'On a mountain'],
+    correctIndex: 0
+  },
+  {
+    passage: 'Coco the parrot has a nest. Her nest is in a red tree.',
+    question: "What colour is Coco's tree?",
+    answers: ['Red', 'Blue', 'Green', 'Yellow'],
+    correctIndex: 0
+  },
+  {
+    passage: 'The bat sleeps all day. He flies at night.',
+    question: 'When does the bat fly?',
+    answers: ['At night', 'In the morning', 'All day', 'Never'],
+    correctIndex: 0
+  },
+  {
+    passage: 'Sophia has two pet rats. Their names are Snowy and Midnight.',
+    question: 'How many pets does Sophia have?',
+    answers: ['Two', 'One', 'Three', 'Four'],
+    correctIndex: 0
+  },
+  {
+    passage: 'The snake was stuck in a tree. Sophia helped him get down.',
+    question: 'Who helped the snake?',
+    answers: ['Sophia', 'Snowy', 'Midnight', 'The bat'],
+    correctIndex: 0
+  },
+  {
+    passage: 'Snowy loves cheese. Midnight loves bananas.',
+    question: 'What does Midnight love?',
+    answers: ['Bananas', 'Cheese', 'Apples', 'Fish'],
+    correctIndex: 0
+  },
+  {
+    passage: 'The party is at the big tree. Everyone is going.',
+    question: 'Where is the party?',
+    answers: ['At the big tree', 'At the beach', 'In the cave', 'By the river'],
+    correctIndex: 0
+  }
+];
+
+const STOP_CONFIGS = {
+  snowy: {
+    id: 'snowy', built: true, displayName: 'Snowy', puzzleKey: 'sumBridge',
+    nextActKey: 'act2', nextStopId: 'crab', partyItemKey: 'bananas',
+    puzzleBank: () => MATHS_QUESTIONS_DEFAULT,
+    sceneBuilder: 'buildSnowyScene', celebrationBuilder: 'celebrateSnowy',
+    dialogue: ["Oh Sophia! I'm so hungry... 🥺", "Can you help me get the cheese? Solve 3 puzzles!"],
+    replayDialogue: ["That was fun! Want to do more maths?"],
+    completeBannerText: 'Stop 1 complete! 🐀✨',
+    winBannerText: '🎉 You did it!',
+    hintText: "It's okay, take your time! 🐀"
+  },
+  crab: {
+    id: 'crab', built: false, displayName: 'Crab', puzzleKey: 'wordTree',
+    nextActKey: 'act3', nextStopId: 'snake', partyItemKey: 'flowers',
+    puzzleBank: () => SPELLING_QUESTIONS_DEFAULT,
+    sceneBuilder: 'buildCrabScene', celebrationBuilder: 'celebrateCrab',
+    dialogue: ["Ouch! My claw is so sore...", "Spell 3 magic words to make it better!"],
+    replayDialogue: ["The magic feels good! Spell some more?"],
+    completeBannerText: 'Stop 2 complete! 🦀✨',
+    winBannerText: '✨ Magic worked!',
+    hintText: "You can do it! 🦀"
+  },
+  snake: {
+    id: 'snake', built: false, displayName: 'Snake', puzzleKey: 'snakeKnots',
+    nextActKey: 'act4', nextStopId: 'bat', partyItemKey: 'stones',
+    puzzleBank: () => PATTERN_QUESTIONS_DEFAULT,
+    sceneBuilder: 'buildSnakeScene', celebrationBuilder: 'celebrateSnake',
+    dialogue: ["I am in terrible knots, darling!", "Solve 3 patterns to un-knot me!"],
+    replayDialogue: ["Oh I do love a pattern! More please, darling?"],
+    completeBannerText: 'Stop 3 complete! 🐍✨',
+    winBannerText: '🐍 Un-knotted!',
+    hintText: "No rush, darling! 🐍"
+  },
+  bat: {
+    id: 'bat', built: false, displayName: 'Bat', puzzleKey: 'batWing',
+    nextActKey: 'act5', nextStopId: 'parrot', partyItemKey: 'musicNotes',
+    puzzleBank: () => COUNTING_QUESTIONS_DEFAULT,
+    sceneBuilder: 'buildBatScene', celebrationBuilder: 'celebrateBat',
+    dialogue: ["I'm too dizzy to count...", "Help me count 3 times and I'll find my strength!"],
+    replayDialogue: ["I feel stronger! Count with me again?"],
+    completeBannerText: 'Stop 4 complete! 🦇✨',
+    winBannerText: '🦇 Healed!',
+    hintText: "Try again, friend! 🦇"
+  },
+  parrot: {
+    id: 'parrot', built: false, displayName: 'Parrot', puzzleKey: 'parrotStory',
+    nextActKey: null, nextStopId: null, partyItemKey: null,
+    puzzleBank: () => READING_QUESTIONS_DEFAULT,
+    sceneBuilder: 'buildParrotScene', celebrationBuilder: 'celebrateParrotFinale',
+    dialogue: ["I'm lost! I can't remember the way home...", "Read my stories and help me find my way!"],
+    replayDialogue: ["I love stories! Read with me again?"],
+    completeBannerText: 'GAME COMPLETE! 🌟',
+    winBannerText: '🎉 YOU HELPED EVERYONE!',
+    hintText: "Have another think! 🦜"
+  }
+};
+
 const SAVE_KEY = 'sophias-rat-jungle-save';
 const DEFAULT_SAVE_STATE = {
   version: 3,
@@ -327,10 +505,22 @@ class QuizManager {
   start() {
     const pool = this.questions.slice();
     Phaser.Math.RND.shuffle(pool);
-    this.selectedQuestions = pool.slice(0, this.questionsToAsk);
+    this.selectedQuestions = pool.slice(0, this.questionsToAsk).map(q => {
+      const tagged = q.answers.map((a, i) => ({ a, isCorrect: i === q.correctIndex }));
+      Phaser.Math.RND.shuffle(tagged);
+      const shuffled = {
+        question: q.question,
+        passage: q.passage,
+        answers: tagged.map(x => x.a),
+        correctIndex: tagged.findIndex(x => x.isCorrect)
+      };
+      return shuffled;
+    });
     this.currentIndex = 0;
     this.dismissed = false;
     this.isOpen = true;
+    this._wrongStreak = 0;
+    this._lastWrongIndex = -1;
     this.scene.activeQuiz = this;
     this._showCurrent();
   }
@@ -371,9 +561,23 @@ class QuizManager {
       fontStyle: 'bold'
     }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2002);
 
-    const questionText = scene.add.text(cx, cy - 90, q.question, {
+    let passageText = null;
+    let questionY = cy - 90;
+    if (q.passage) {
+      passageText = scene.add.text(cx, cy - 130, q.passage, {
+        fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+        fontSize: '17px',
+        color: '#4a2c1a',
+        fontStyle: 'italic',
+        align: 'center',
+        wordWrap: { width: cardW - 70 }
+      }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2002);
+      questionY = cy - 60;
+    }
+
+    const questionText = scene.add.text(cx, questionY, q.question, {
       fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
-      fontSize: '26px',
+      fontSize: q.passage ? '22px' : '26px',
       color: '#2a2a2a',
       fontStyle: 'bold',
       align: 'center',
@@ -429,6 +633,7 @@ class QuizManager {
     closeBg.on('pointerdown', () => this.dismiss());
 
     this.modalElements = [overlay, shadow, card, progress, questionText, closeBg, closeText];
+    if (passageText) this.modalElements.push(passageText);
     for (const b of buttons) {
       this.modalElements.push(b.bg, b.letter, b.answerText);
     }
@@ -469,6 +674,7 @@ class QuizManager {
       this._answering = true;
       this._flashButton(btn, 0x4caf50);
       playCorrect();
+      this._wrongStreak = 0;
       this.scene.time.delayedCall(550, () => {
         this._answering = false;
         this.currentIndex++;
@@ -477,8 +683,46 @@ class QuizManager {
     } else {
       this._flashButton(btn, 0xef5350);
       playWrong();
+      this._wrongStreak++;
+      if (this._wrongStreak >= 2 && this.options.animalHints && this.options.animalHints.hint) {
+        this._showHintBubble(this.options.animalHints.hint);
+      }
       this.onWrong(index);
     }
+  }
+
+  _showHintBubble(text) {
+    if (this._hintActive) return;
+    this._hintActive = true;
+    const scene = this.scene;
+    const cam = scene.cameras.main;
+    const cx = cam.width / 2, cy = cam.height / 2;
+    const cardH = 440;
+    const hintY = cy - cardH / 2 - 30;
+    const t = scene.add.text(cx, hintY, text, {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '16px',
+      color: '#2a2a2a',
+      fontStyle: 'bold',
+      align: 'center'
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2010);
+    const bg = scene.add.rectangle(cx, hintY, t.width + 28, t.height + 14, 0xfff9c4, 0.95)
+      .setStrokeStyle(2, 0xc9a13d).setScrollFactor(0).setDepth(2009);
+    const tail = scene.add.triangle(cx, hintY + 18, -8, 0, 8, 0, 0, 10, 0xfff9c4)
+      .setStrokeStyle(2, 0xc9a13d).setScrollFactor(0).setDepth(2009);
+    bg.alpha = 0; t.alpha = 0; tail.alpha = 0;
+    scene.tweens.add({ targets: [bg, t, tail], alpha: 1, duration: 220, ease: 'Back.easeOut' });
+    scene.time.delayedCall(3000, () => {
+      scene.tweens.add({
+        targets: [bg, t, tail], alpha: 0, duration: 350,
+        onComplete: () => {
+          if (bg.active) bg.destroy();
+          if (t.active) t.destroy();
+          if (tail.active) tail.destroy();
+          this._hintActive = false;
+        }
+      });
+    });
   }
 
   _flashButton(btn, flashColor) {
@@ -508,6 +752,473 @@ class QuizManager {
     this._destroyModal();
     this._removeKeyHandlers();
     if (this.scene.activeQuiz === this) this.scene.activeQuiz = null;
+  }
+}
+
+class DialogueSequence {
+  constructor(scene, lines, onComplete) {
+    this.scene = scene;
+    this.lines = lines;
+    this.onComplete = onComplete;
+    this.index = 0;
+    this.elements = [];
+    this.dismissed = false;
+    this.tapHandler = null;
+    this.keyHandler = null;
+    this.advanceTimer = null;
+  }
+
+  start() {
+    this.tapHandler = () => this._advance();
+    this.scene.input.on('pointerdown', this.tapHandler);
+    this.keyHandler = (e) => {
+      if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        this._advance();
+      }
+    };
+    window.addEventListener('keydown', this.keyHandler);
+    this._show();
+  }
+
+  _show() {
+    this._destroyCurrent();
+    if (this.index >= this.lines.length) {
+      this._cleanup();
+      this.onComplete();
+      return;
+    }
+    const scene = this.scene;
+    const cam = scene.cameras.main;
+    const cx = cam.width / 2;
+    const cy = cam.height - 110;
+    const text = this.lines[this.index];
+    const t = scene.add.text(cx, cy, text, {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '22px',
+      color: '#2a2a2a',
+      fontStyle: 'bold',
+      align: 'center',
+      wordWrap: { width: cam.width - 100 }
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(1500);
+    const padX = 24, padY = 16;
+    const bg = scene.add.rectangle(cx, cy, t.width + padX * 2, t.height + padY * 2, 0xfffaf0, 0.96)
+      .setStrokeStyle(3, 0x4a2c1a)
+      .setScrollFactor(0).setDepth(1499);
+    const hint = scene.add.text(cx, cam.height - 28, 'Tap to continue', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '12px',
+      color: '#8b6f3a',
+      fontStyle: 'italic'
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(1500);
+    bg.alpha = 0; t.alpha = 0; hint.alpha = 0;
+    scene.tweens.add({ targets: [bg, t, hint], alpha: 1, duration: 280 });
+    this.elements = [bg, t, hint];
+    this.advanceTimer = scene.time.delayedCall(4000, () => this._advance());
+  }
+
+  _advance() {
+    if (this.dismissed) return;
+    if (this.advanceTimer) this.advanceTimer.remove(false);
+    this.advanceTimer = null;
+    this.index++;
+    this._show();
+  }
+
+  _destroyCurrent() {
+    for (const e of this.elements) {
+      if (e && e.destroy) e.destroy();
+    }
+    this.elements = [];
+  }
+
+  _cleanup() {
+    if (this.dismissed) return;
+    this.dismissed = true;
+    this._destroyCurrent();
+    if (this.tapHandler) {
+      this.scene.input.off('pointerdown', this.tapHandler);
+      this.tapHandler = null;
+    }
+    if (this.keyHandler) {
+      window.removeEventListener('keydown', this.keyHandler);
+      this.keyHandler = null;
+    }
+    if (this.advanceTimer) {
+      this.advanceTimer.remove(false);
+      this.advanceTimer = null;
+    }
+  }
+}
+
+class StopScene extends Phaser.Scene {
+  constructor() { super('Stop'); }
+
+  create(data) {
+    this.config = STOP_CONFIGS[data.stopId];
+    this.returnTo = data.returnTo;
+    this.lookHeld = { left: false, right: false };
+    this.exiting = false;
+    this.activeQuiz = null;
+    this.completedThisVisit = false;
+    this.isReplay = false;
+    this.dialogue = null;
+
+    this.cameras.main.setBounds(-200, 0, 1200, 600);
+    this.cameras.main.scrollX = 0;
+
+    if (typeof this[this.config.sceneBuilder] === 'function') {
+      this[this.config.sceneBuilder]();
+    }
+    this.buildLookZones();
+    this.buildBackButton();
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.cameras.main.fadeIn(500, 255, 255, 255);
+    this.time.delayedCall(700, () => this.startDialogue());
+  }
+
+  startDialogue() {
+    const save = SaveManager.load();
+    this.isReplay = save.puzzlesSolved[this.config.puzzleKey] === true;
+    const lines = this.isReplay ? this.config.replayDialogue : this.config.dialogue;
+    this.dialogue = new DialogueSequence(this, lines, () => this.startQuiz());
+    this.dialogue.start();
+  }
+
+  startQuiz() {
+    const questions = this.config.puzzleBank();
+    const quiz = new QuizManager(this, questions, {
+      onComplete: () => this.startCelebration(),
+      onWrong: () => {},
+      animalHints: { hint: this.config.hintText }
+    });
+    quiz.start();
+  }
+
+  startCelebration() {
+    if (!this.isReplay) {
+      this.applySaveProgress();
+      this.completedThisVisit = true;
+    }
+    if (typeof this[this.config.celebrationBuilder] === 'function') {
+      this[this.config.celebrationBuilder](() => this.exitToMap(false));
+    } else {
+      this.exitToMap(false);
+    }
+  }
+
+  applySaveProgress() {
+    const save = SaveManager.load();
+    save.puzzlesSolved[this.config.puzzleKey] = true;
+    if (this.config.nextActKey) save.actsUnlocked[this.config.nextActKey] = true;
+    if (this.config.partyItemKey) {
+      save.partyItems[this.config.partyItemKey] = (save.partyItems[this.config.partyItemKey] || 0) + 1;
+    }
+    if (this.config.id === 'parrot') {
+      save.partyItems.goldenBanana = true;
+      save.stats.gameCompleted = true;
+    }
+    SaveManager.save(save);
+  }
+
+  exitToMap(viaBack) {
+    if (this.exiting) return;
+    this.exiting = true;
+    if (this.dialogue) this.dialogue._cleanup();
+    if (this.activeQuiz && this.activeQuiz.isOpen) this.activeQuiz.dismiss();
+    this.cameras.main.fadeOut(500, 255, 255, 255);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.start('TopDown', {
+        returnTo: this.returnTo,
+        justCompleted: (this.completedThisVisit && !viaBack) ? this.config.id : null
+      });
+    });
+  }
+
+  buildLookZones() {
+    const cam = this.cameras.main;
+    const cw = cam.width, ch = cam.height;
+    const left = this.add.rectangle(cw * 0.18, ch / 2, cw * 0.36, ch * 0.6, 0xffffff, 0)
+      .setScrollFactor(0).setDepth(900).setInteractive();
+    const right = this.add.rectangle(cw * 0.82, ch / 2, cw * 0.36, ch * 0.6, 0xffffff, 0)
+      .setScrollFactor(0).setDepth(900).setInteractive();
+    left.on('pointerdown', () => { this.lookHeld.left = true; });
+    left.on('pointerup',   () => { this.lookHeld.left = false; });
+    left.on('pointerout',  () => { this.lookHeld.left = false; });
+    left.on('pointerupoutside', () => { this.lookHeld.left = false; });
+    right.on('pointerdown', () => { this.lookHeld.right = true; });
+    right.on('pointerup',   () => { this.lookHeld.right = false; });
+    right.on('pointerout',  () => { this.lookHeld.right = false; });
+    right.on('pointerupoutside', () => { this.lookHeld.right = false; });
+  }
+
+  buildBackButton() {
+    const backBg = this.add.rectangle(60, 50, 96, 50, 0xffeb3b, 0.95)
+      .setScrollFactor(0).setStrokeStyle(3, 0x8b5a2b).setDepth(1000);
+    const backTxt = this.add.text(60, 50, 'BACK', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '22px', color: '#4a2c1a', fontStyle: 'bold'
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(1001);
+    backBg.setInteractive({ useHandCursor: true });
+    backBg.on('pointerdown', () => this.exitToMap(true));
+    backTxt.setInteractive({ useHandCursor: true });
+    backTxt.on('pointerdown', () => this.exitToMap(true));
+  }
+
+  update(time, delta) {
+    if (this.exiting) return;
+    if (this.activeQuiz && this.activeQuiz.isOpen) return;
+    const step = 320 * delta / 1000;
+    if (this.cursors.left.isDown || this.lookHeld.left) this.cameras.main.scrollX -= step;
+    if (this.cursors.right.isDown || this.lookHeld.right) this.cameras.main.scrollX += step;
+    this.cameras.main.scrollX = Phaser.Math.Clamp(this.cameras.main.scrollX, -200, 400);
+  }
+
+  makeWinBanner(text) {
+    const cam = this.cameras.main;
+    const cx = cam.width / 2;
+    const bg = this.add.rectangle(cx, 70, 600, 80, 0x4a2c1a, 0.92)
+      .setStrokeStyle(4, 0xffeb3b).setScrollFactor(0).setDepth(2500);
+    const txt = this.add.text(cx, 70, text, {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '32px', color: '#ffeb3b', fontStyle: 'bold',
+      stroke: '#000000', strokeThickness: 4
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2501);
+    bg.alpha = 0; txt.alpha = 0;
+    this.tweens.add({ targets: [bg, txt], alpha: 1, scale: { from: 0.5, to: 1 }, duration: 400, ease: 'Back.easeOut' });
+    return { bg, txt };
+  }
+
+  updateBanner(banner, newText) {
+    banner.txt.setText(newText);
+    this.tweens.add({ targets: [banner.bg, banner.txt], scale: { from: 1.15, to: 1 }, duration: 300, ease: 'Back.easeOut' });
+  }
+
+  spawnConfetti(count) {
+    const cam = this.cameras.main;
+    const cw = cam.width;
+    const colors = [0xff5e7e, 0xffeb3b, 0xa8e6cf, 0xb5d7f0, 0xd5b8e8, 0xffd3b6];
+    for (let i = 0; i < count; i++) {
+      const x = Math.random() * cw;
+      const y = -10 - Math.random() * 80;
+      const piece = this.add.rectangle(x, y, 8, 12, Phaser.Math.RND.pick(colors))
+        .setScrollFactor(0).setDepth(2400);
+      piece.setAngle(Math.random() * 360);
+      this.tweens.add({
+        targets: piece,
+        y: cam.height + 30,
+        angle: piece.angle + 360 * (Math.random() > 0.5 ? 1 : -1),
+        x: x + Phaser.Math.Between(-80, 80),
+        duration: 3000 + Math.random() * 1500,
+        ease: 'Cubic.easeIn',
+        onComplete: () => piece.destroy()
+      });
+    }
+  }
+
+  spawnSparkles(x, y, count) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 50 + Math.random() * 100;
+      const star = this.add.star(x, y, 4, 3, 8, 0xffeb3b).setDepth(2400);
+      this.tweens.add({
+        targets: star,
+        x: x + Math.cos(angle) * radius,
+        y: y + Math.sin(angle) * radius,
+        scale: { from: 1.2, to: 0 },
+        alpha: { from: 1, to: 0 },
+        angle: 360,
+        duration: 900 + Math.random() * 600,
+        ease: 'Cubic.easeOut',
+        onComplete: () => star.destroy()
+      });
+    }
+  }
+
+  scheduleContinue(onComplete, delayMs) {
+    let fired = false;
+    const fire = () => {
+      if (fired) return;
+      fired = true;
+      this.input.off('pointerdown', tapHandler);
+      window.removeEventListener('keydown', keyHandler);
+      onComplete();
+    };
+    const tapHandler = () => fire();
+    const keyHandler = (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); fire(); } };
+    this.time.delayedCall(delayMs || 4000, fire);
+    this.input.on('pointerdown', tapHandler);
+    window.addEventListener('keydown', keyHandler);
+  }
+
+  // ====================================================
+  // Stop 1 — Snowy's hungry
+  // ====================================================
+  buildSnowyScene() {
+    this.add.rectangle(400, 100, 2000, 220, 0xffd180).setScrollFactor(0);
+    this.add.rectangle(400, 240, 2000, 80, 0xffe0a0).setScrollFactor(0);
+    this.add.rectangle(400, 305, 2000, 50, 0xfff0c0).setScrollFactor(0);
+
+    this.add.circle(620, 110, 55, 0xfff9c4, 0.4).setScrollFactor(0.05);
+    this.add.circle(620, 110, 40, 0xffeb3b, 0.95).setScrollFactor(0.05);
+    this.add.circle(612, 102, 16, 0xffffff, 0.7).setScrollFactor(0.05);
+
+    for (let i = 0; i < 4; i++) {
+      const cx = -200 + i * 320 + Phaser.Math.Between(-30, 30);
+      const cy = 150 + Phaser.Math.Between(-15, 25);
+      this.add.ellipse(cx, cy, 140, 28, 0xffffff, 0.7).setScrollFactor(0.12);
+      this.add.ellipse(cx + 30, cy + 5, 100, 22, 0xffffff, 0.7).setScrollFactor(0.12);
+    }
+
+    for (let i = 0; i < 9; i++) {
+      const tx = -300 + i * 180 + Phaser.Math.Between(-30, 30);
+      this.add.circle(tx, 340, Phaser.Math.Between(40, 75), 0x2a4a2a).setScrollFactor(0.25);
+    }
+
+    for (let i = 0; i < 7; i++) {
+      const tx = -200 + i * 200 + Phaser.Math.Between(-30, 30);
+      this.add.circle(tx, 380, Phaser.Math.Between(50, 80), 0x4a7a3a).setScrollFactor(0.45);
+    }
+
+    const treeX = 600;
+    this.add.rectangle(treeX, 320, 30, 250, 0x6b4423).setScrollFactor(0.6).setOrigin(0.5, 0);
+    this.add.rectangle(treeX - 6, 320, 6, 250, 0x4a2c1a).setScrollFactor(0.6).setOrigin(0.5, 0);
+    this.add.circle(treeX - 30, 280, 55, 0x1b5e20).setScrollFactor(0.6);
+    this.add.circle(treeX + 30, 280, 55, 0x2e7d32).setScrollFactor(0.6);
+    this.add.circle(treeX, 250, 60, 0x388e3c).setScrollFactor(0.6);
+    this.add.rectangle(treeX, 360, 3, 90, 0x8b5a2b).setScrollFactor(0.6).setOrigin(0.5, 0);
+
+    this.cheese = this.add.container(treeX, 460);
+    this.cheese.add(this.add.circle(0, 0, 16, 0xfff176));
+    this.cheese.add(this.add.circle(0, 0, 16, 0x000000, 0).setStrokeStyle(2, 0xc9a13d));
+    this.cheese.add(this.add.circle(-5, -3, 2.5, 0xc9a13d));
+    this.cheese.add(this.add.circle(3, 5, 2.5, 0xc9a13d));
+    this.cheese.add(this.add.circle(6, -5, 1.5, 0xc9a13d));
+    this.cheese.setScrollFactor(0.6);
+    this.tweens.add({
+      targets: this.cheese,
+      angle: { from: -4, to: 4 },
+      duration: 2200,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+
+    const logY = 540;
+    this.add.ellipse(300, logY + 16, 320, 16, 0x000000, 0.3).setScrollFactor(1);
+    this.add.ellipse(300, logY, 320, 80, 0x6b4423).setScrollFactor(1);
+    this.add.ellipse(300, logY - 6, 320, 60, 0x8b5a2b).setScrollFactor(1);
+    this.add.ellipse(140, logY, 40, 50, 0x4a2c1a).setScrollFactor(1);
+    this.add.ellipse(460, logY, 40, 50, 0x4a2c1a).setScrollFactor(1);
+    this.add.ellipse(140, logY, 28, 36, 0x2a1810).setScrollFactor(1);
+    this.add.ellipse(460, logY, 28, 36, 0x2a1810).setScrollFactor(1);
+
+    this.snowyChar = this.makeSnowyCharacter(280, logY - 28);
+
+    this.add.rectangle(400, 600, 2000, 80, 0x267d3a).setScrollFactor(1);
+    this.add.rectangle(400, 585, 2000, 30, 0x3a9c4a, 0.6).setScrollFactor(1);
+
+    this.makeButterfly(150, 220);
+    this.makeButterfly(450, 200);
+    this.makeButterfly(720, 260);
+  }
+
+  makeSnowyCharacter(x, y) {
+    const c = this.add.container(x, y);
+    c.setScrollFactor(1);
+    const tail = this.add.graphics();
+    tail.lineStyle(5, 0xffc4c4, 1);
+    tail.beginPath();
+    tail.moveTo(-30, 4); tail.lineTo(-44, -6); tail.lineTo(-56, 6); tail.lineTo(-64, -2);
+    tail.strokePath();
+    const body = this.add.ellipse(0, 0, 64, 40, 0xf5f5f5);
+    const bodyShade = this.add.ellipse(0, 10, 56, 14, 0xd0d0d0);
+    const head = this.add.circle(26, 0, 22, 0xf5f5f5);
+    const earL = this.add.circle(32, -14, 9, 0xf5f5f5);
+    const earR = this.add.circle(32, 14, 9, 0xf5f5f5);
+    const earLInner = this.add.circle(32, -14, 5, 0xffc4c4);
+    const earRInner = this.add.circle(32, 14, 5, 0xffc4c4);
+    const eyeL = this.add.ellipse(34, -6, 6, 3, 0x2a2a2a);
+    const eyeR = this.add.ellipse(34, 6, 6, 3, 0x2a2a2a);
+    const nose = this.add.circle(46, 0, 4, 0xff8888);
+    const whiskers = this.add.graphics();
+    whiskers.lineStyle(1, 0x888888, 0.7);
+    whiskers.beginPath();
+    whiskers.moveTo(42, -3); whiskers.lineTo(54, -6);
+    whiskers.moveTo(42, 0);  whiskers.lineTo(56, 0);
+    whiskers.moveTo(42, 3);  whiskers.lineTo(54, 6);
+    whiskers.strokePath();
+    c.add([tail, body, bodyShade, head, earL, earR, earLInner, earRInner, eyeL, eyeR, nose, whiskers]);
+    this.tweens.add({
+      targets: c,
+      scaleY: { from: 1, to: 0.96 },
+      duration: 1800,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+    return c;
+  }
+
+  makeButterfly(x, y) {
+    const c = this.add.container(x, y);
+    c.setScrollFactor(0.7);
+    const color = Phaser.Math.RND.pick([0xff8e3c, 0xff5e7e, 0xffeb3b, 0xb967ff]);
+    const wing1 = this.add.ellipse(-7, 0, 16, 22, color);
+    const wing2 = this.add.ellipse(7, 0, 16, 22, color);
+    const body = this.add.ellipse(0, 0, 3, 16, 0x4a2c1a);
+    c.add([wing1, wing2, body]);
+    this.tweens.add({
+      targets: c,
+      x: x + Phaser.Math.Between(-80, 80),
+      y: y + Phaser.Math.Between(-30, 30),
+      duration: 3000 + Math.random() * 2000,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+    this.tweens.add({
+      targets: [wing1, wing2],
+      scaleX: 0.35,
+      duration: 180,
+      yoyo: true,
+      repeat: -1
+    });
+    return c;
+  }
+
+  celebrateSnowy(onComplete) {
+    const banner = this.makeWinBanner(this.config.winBannerText);
+    playFanfare();
+    this.tweens.add({
+      targets: this.cheese,
+      y: 530,
+      duration: 1500,
+      ease: 'Cubic.easeIn'
+    });
+    this.time.delayedCall(1600, () => {
+      this.tweens.add({
+        targets: this.snowyChar,
+        angle: { from: -10, to: 10 },
+        duration: 200,
+        yoyo: true,
+        repeat: 5
+      });
+      this.tweens.add({
+        targets: this.snowyChar,
+        y: this.snowyChar.y - 22,
+        duration: 380,
+        yoyo: true,
+        repeat: 2,
+        ease: 'Sine.easeInOut'
+      });
+      this.spawnSparkles(this.snowyChar.x, this.snowyChar.y, 24);
+    });
+    this.spawnConfetti(60);
+    this.time.delayedCall(2800, () => {
+      this.updateBanner(banner, this.config.completeBannerText);
+    });
+    this.scheduleContinue(onComplete, 4500);
   }
 }
 
@@ -621,6 +1332,75 @@ class TopDownScene extends Phaser.Scene {
     this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
     this.cameras.main.fadeIn(350, 255, 255, 255);
+
+    if (data && data.justCompleted) {
+      this.handleReturnFromStop(data.justCompleted);
+    }
+
+    if (SaveManager.load().stats.gameCompleted) {
+      this.partyMode = true;
+    }
+  }
+
+  handleReturnFromStop(stopId) {
+    const m = this.stopMarkers.find(x => x.spec.id === stopId);
+    if (m) {
+      this.tweens.add({
+        targets: m.container,
+        scale: { from: 1.4, to: 1 },
+        duration: 600,
+        ease: 'Back.easeOut'
+      });
+      this.spawnReturnSparkles(m.spec.x, m.spec.y);
+    }
+    const nextSpec = STOP_MARKERS.find(s => s.prereq === stopId);
+    if (nextSpec) {
+      this.pathHighlightUntil = this.scene.systems.game.getTime() + 3500;
+      const nextMarker = this.stopMarkers.find(x => x.spec.id === nextSpec.id);
+      if (nextMarker) {
+        this.tweens.add({
+          targets: nextMarker.container,
+          scale: { from: 1.6, to: 1 },
+          duration: 800,
+          ease: 'Back.easeOut',
+          delay: 400
+        });
+      }
+    }
+    if (this.snowy) this.spawnRatPuff(this.snowy.x, this.snowy.y);
+    if (this.midnight) this.spawnRatPuff(this.midnight.x, this.midnight.y);
+  }
+
+  spawnReturnSparkles(x, y) {
+    for (let i = 0; i < 14; i++) {
+      const angle = (i / 14) * Math.PI * 2;
+      const star = this.add.star(x, y, 4, 3, 8, 0xffeb3b).setDepth(70);
+      this.tweens.add({
+        targets: star,
+        x: x + Math.cos(angle) * 60,
+        y: y + Math.sin(angle) * 60,
+        scale: { from: 1, to: 0 },
+        alpha: { from: 1, to: 0 },
+        angle: 360,
+        duration: 700,
+        ease: 'Cubic.easeOut',
+        onComplete: () => star.destroy()
+      });
+    }
+  }
+
+  spawnRatPuff(x, y) {
+    for (let i = 0; i < 6; i++) {
+      const puff = this.add.circle(x + Phaser.Math.Between(-8, 8), y + Phaser.Math.Between(-4, 4), 6, 0xffffff, 0.8).setDepth(70);
+      this.tweens.add({
+        targets: puff,
+        scale: { from: 0.6, to: 1.6 },
+        alpha: { from: 0.85, to: 0 },
+        duration: 500,
+        ease: 'Cubic.easeOut',
+        onComplete: () => puff.destroy()
+      });
+    }
   }
 
   buildBeach() {
@@ -1416,6 +2196,8 @@ class TopDownScene extends Phaser.Scene {
   }
 
   makeStopMarker(spec) {
+    const save = SaveManager.load();
+    const completed = save.puzzlesSolved[spec.puzzleKey] === true;
     const unlocked = this.isStopUnlocked(spec);
     const c = this.add.container(spec.x, spec.y);
     c.setDepth(60);
@@ -1446,7 +2228,15 @@ class TopDownScene extends Phaser.Scene {
       ? this.add.star(0, -28, 5, 2, 4, 0xffffff).setAlpha(0.85)
       : null;
 
-    const elements = [groundShadow, outerGlow, midGlow, padBase, padTop, padRim, ...silhouetteParts, lockedRing, lockedQuestion];
+    const completedRingBg = this.add.circle(18, -16, 11, 0x4caf50, completed ? 1 : 0).setStrokeStyle(2, 0x1b5e20, completed ? 1 : 0);
+    const completedCheck = this.add.text(18, -16, '✓', {
+      fontFamily: 'DM Sans, system-ui, sans-serif',
+      fontSize: '14px',
+      color: '#ffffff',
+      fontStyle: 'bold'
+    }).setOrigin(0.5, 0.5).setAlpha(completed ? 1 : 0);
+
+    const elements = [groundShadow, outerGlow, midGlow, padBase, padTop, padRim, ...silhouetteParts, lockedRing, lockedQuestion, completedRingBg, completedCheck];
     if (sparkle) elements.push(sparkle);
     c.add(elements);
 
@@ -1472,8 +2262,7 @@ class TopDownScene extends Phaser.Scene {
     padTop.setInteractive(new Phaser.Geom.Circle(0, 0, 26), Phaser.Geom.Circle.Contains);
     padTop.on('pointerdown', () => {
       if (this.placeholderOpen || (this.activeQuiz && this.activeQuiz.isOpen)) return;
-      if (this.isStopUnlocked(spec)) this.showStopPlaceholder(spec);
-      else this.showLockedToast(spec);
+      this.routeStopEntry(spec);
     });
 
     return {
@@ -1620,9 +2409,33 @@ class TopDownScene extends Phaser.Scene {
       m.container.scale += (targetScale - m.container.scale) * 0.12;
     }
     if (nearest && Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
-      if (this.isStopUnlocked(nearest.spec)) this.showStopPlaceholder(nearest.spec);
-      else this.showLockedToast(nearest.spec);
+      this.routeStopEntry(nearest.spec);
     }
+  }
+
+  routeStopEntry(spec) {
+    if (!this.isStopUnlocked(spec)) {
+      this.showLockedToast(spec);
+      return;
+    }
+    const cfg = STOP_CONFIGS[spec.id];
+    if (cfg && cfg.built) {
+      this.enterStop(spec);
+    } else {
+      this.showStopPlaceholder(spec);
+    }
+  }
+
+  enterStop(spec) {
+    if (this.exiting) return;
+    this.exiting = true;
+    this.cameras.main.fadeOut(450, 255, 255, 255);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.start('Stop', {
+        stopId: spec.id,
+        returnTo: { x: spec.x, y: spec.y + 70 }
+      });
+    });
   }
 
   markStopUnlocked(stopId) {
@@ -2150,10 +2963,32 @@ const config = {
   height: 600,
   backgroundColor: '#2d8a3e',
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-  scene: [TopDownScene, PeekScene]
+  scene: [TopDownScene, PeekScene, StopScene]
 };
 
 window.game = new Phaser.Game(config);
+
+window.testStop = function (stopId) {
+  const top = window.game.scene.getScene('TopDown');
+  if (!top || !top.sys.isActive()) {
+    console.log('TopDown not ready');
+    return;
+  }
+  const spec = STOP_MARKERS.find(s => s.id === stopId);
+  if (!spec) { console.log('Unknown stop:', stopId); return; }
+  top.enterStop(spec);
+};
+
+window.completeStop = function (stopId) {
+  const cfg = STOP_CONFIGS[stopId];
+  if (!cfg) return;
+  const save = SaveManager.load();
+  save.puzzlesSolved[cfg.puzzleKey] = true;
+  if (cfg.nextActKey) save.actsUnlocked[cfg.nextActKey] = true;
+  if (cfg.partyItemKey) save.partyItems[cfg.partyItemKey] = (save.partyItems[cfg.partyItemKey] || 0) + 1;
+  SaveManager.save(save);
+  console.log('Marked', stopId, 'complete in save. Reload to see effect.');
+};
 
 window.testQuiz = function () {
   const top = window.game.scene.getScene('TopDown');
