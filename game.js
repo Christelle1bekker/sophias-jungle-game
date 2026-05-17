@@ -279,6 +279,230 @@ function playWrong() {
   osc.stop(t + 0.25);
 }
 
+function playCorrect() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  const notes = [659.25, 987.77];
+  notes.forEach((f, i) => {
+    const t = ctx.currentTime + i * 0.08;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = f;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.15, t + 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.2);
+  });
+}
+
+class QuizManager {
+  constructor(scene, questions, options) {
+    this.scene = scene;
+    this.questions = questions;
+    this.options = options || {};
+    this.onComplete = this.options.onComplete || (() => {});
+    this.onWrong = this.options.onWrong || (() => {});
+    this.questionsToAsk = Math.min(3, questions.length);
+    this.selectedQuestions = [];
+    this.currentIndex = 0;
+    this.modalElements = [];
+    this.currentButtons = [];
+    this.isOpen = false;
+    this.dismissed = false;
+    this._answering = false;
+    this.keyHandlers = null;
+  }
+
+  start() {
+    const pool = this.questions.slice();
+    Phaser.Math.RND.shuffle(pool);
+    this.selectedQuestions = pool.slice(0, this.questionsToAsk);
+    this.currentIndex = 0;
+    this.dismissed = false;
+    this.isOpen = true;
+    this.scene.activeQuiz = this;
+    this._showCurrent();
+  }
+
+  _showCurrent() {
+    this._destroyModal();
+    if (this.currentIndex >= this.selectedQuestions.length) {
+      this.isOpen = false;
+      this._removeKeyHandlers();
+      if (this.scene.activeQuiz === this) this.scene.activeQuiz = null;
+      this.onComplete();
+      return;
+    }
+    this._buildModal(this.selectedQuestions[this.currentIndex]);
+  }
+
+  _buildModal(q) {
+    const scene = this.scene;
+    const cam = scene.cameras.main;
+    const cw = cam.width, ch = cam.height;
+    const cx = cw / 2, cy = ch / 2;
+
+    const overlay = scene.add.rectangle(cx, cy, cw, ch, 0x000000, 0.55)
+      .setScrollFactor(0).setDepth(2000).setInteractive();
+
+    const cardW = 580, cardH = 440;
+    const shadow = scene.add.rectangle(cx + 6, cy + 8, cardW, cardH, 0x000000, 0.3)
+      .setScrollFactor(0).setDepth(2001);
+    const card = scene.add.rectangle(cx, cy, cardW, cardH, 0xfffaf0)
+      .setStrokeStyle(4, 0x4a2c1a)
+      .setScrollFactor(0).setDepth(2001);
+
+    const progress = scene.add.text(cx, cy - cardH / 2 + 26,
+      'Question ' + (this.currentIndex + 1) + ' of ' + this.questionsToAsk, {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '16px',
+      color: '#6b4423',
+      fontStyle: 'bold'
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2002);
+
+    const questionText = scene.add.text(cx, cy - 90, q.question, {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '26px',
+      color: '#2a2a2a',
+      fontStyle: 'bold',
+      align: 'center',
+      wordWrap: { width: cardW - 60 }
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2002);
+
+    const btnW = 240, btnH = 90;
+    const btnGapX = 24, btnGapY = 18;
+    const btnColors = [0xa8e6cf, 0xffd3b6, 0xb5d7f0, 0xd5b8e8];
+    const btnTextColors = ['#1f5e44', '#7a3a14', '#1a4a6e', '#4e2a6e'];
+    const letters = ['A', 'B', 'C', 'D'];
+    const gridTop = cy + 35;
+    const buttons = [];
+    for (let i = 0; i < 4; i++) {
+      const col = i % 2, row = Math.floor(i / 2);
+      const bx = cx + (col === 0 ? -(btnW / 2 + btnGapX / 2) : (btnW / 2 + btnGapX / 2));
+      const by = gridTop + (row === 0 ? -(btnH / 2 + btnGapY / 2) : (btnH / 2 + btnGapY / 2));
+      const bg = scene.add.rectangle(bx, by, btnW, btnH, btnColors[i])
+        .setStrokeStyle(3, 0x4a2c1a)
+        .setScrollFactor(0).setDepth(2002)
+        .setInteractive({ useHandCursor: true });
+      const letter = scene.add.text(bx - btnW / 2 + 18, by, letters[i], {
+        fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+        fontSize: '24px',
+        color: btnTextColors[i],
+        fontStyle: 'bold'
+      }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(2003);
+      const answer = q.answers[i] !== undefined ? String(q.answers[i]) : '';
+      const answerText = scene.add.text(bx + 14, by, answer, {
+        fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+        fontSize: '20px',
+        color: btnTextColors[i],
+        fontStyle: 'bold',
+        align: 'center',
+        wordWrap: { width: btnW - 50 }
+      }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2003);
+      const idx = i;
+      bg.on('pointerdown', () => this._answerSelected(idx, bg));
+      buttons.push({ bg, letter, answerText, originalColor: btnColors[i] });
+    }
+
+    const closeR = 18;
+    const closeBg = scene.add.circle(cx + cardW / 2 - closeR - 8, cy - cardH / 2 + closeR + 8, closeR, 0xff6b6b)
+      .setStrokeStyle(3, 0x4a2c1a)
+      .setScrollFactor(0).setDepth(2003)
+      .setInteractive({ useHandCursor: true });
+    const closeText = scene.add.text(closeBg.x, closeBg.y, '✕', {
+      fontFamily: 'DM Sans, system-ui, sans-serif',
+      fontSize: '22px',
+      color: '#ffffff',
+      fontStyle: 'bold'
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2004);
+    closeBg.on('pointerdown', () => this.dismiss());
+
+    this.modalElements = [overlay, shadow, card, progress, questionText, closeBg, closeText];
+    for (const b of buttons) {
+      this.modalElements.push(b.bg, b.letter, b.answerText);
+    }
+    this.currentButtons = buttons;
+
+    this._installKeyHandlers();
+  }
+
+  _installKeyHandlers() {
+    this._removeKeyHandlers();
+    this.keyHandlers = (e) => {
+      if (!this.isOpen || this._answering) return;
+      const key = e.key.toLowerCase();
+      const map = { a: 0, b: 1, c: 2, d: 3 };
+      if (key in map) {
+        e.preventDefault();
+        const idx = map[key];
+        if (this.currentButtons[idx]) this._answerSelected(idx, this.currentButtons[idx].bg);
+      } else if (key === 'escape') {
+        e.preventDefault();
+        this.dismiss();
+      }
+    };
+    window.addEventListener('keydown', this.keyHandlers);
+  }
+
+  _removeKeyHandlers() {
+    if (this.keyHandlers) {
+      window.removeEventListener('keydown', this.keyHandlers);
+      this.keyHandlers = null;
+    }
+  }
+
+  _answerSelected(index, btn) {
+    if (this._answering || !this.isOpen) return;
+    const q = this.selectedQuestions[this.currentIndex];
+    if (index === q.correctIndex) {
+      this._answering = true;
+      this._flashButton(btn, 0x4caf50);
+      playCorrect();
+      this.scene.time.delayedCall(550, () => {
+        this._answering = false;
+        this.currentIndex++;
+        this._showCurrent();
+      });
+    } else {
+      this._flashButton(btn, 0xef5350);
+      playWrong();
+      this.onWrong(index);
+    }
+  }
+
+  _flashButton(btn, flashColor) {
+    const original = btn.fillColor;
+    btn.setFillStyle(flashColor);
+    this.scene.tweens.add({
+      targets: btn,
+      scaleX: { from: 1.08, to: 1 },
+      scaleY: { from: 1.08, to: 1 },
+      duration: 280,
+      ease: 'Back.easeOut',
+      onComplete: () => { if (btn.active) btn.setFillStyle(original); }
+    });
+  }
+
+  _destroyModal() {
+    for (const e of this.modalElements) {
+      if (e && e.destroy) e.destroy();
+    }
+    this.modalElements = [];
+    this.currentButtons = [];
+  }
+
+  dismiss() {
+    this.isOpen = false;
+    this.dismissed = true;
+    this._destroyModal();
+    this._removeKeyHandlers();
+    if (this.scene.activeQuiz === this) this.scene.activeQuiz = null;
+  }
+}
+
 class TopDownScene extends Phaser.Scene {
   constructor() { super('TopDown'); }
 
@@ -911,10 +1135,13 @@ class TopDownScene extends Phaser.Scene {
     if (this.exiting) return;
     const step = SOPHIA_SPEED * (delta / 1000);
     let dx = 0, dy = 0;
-    if (this.cursors.left.isDown)  dx -= step;
-    if (this.cursors.right.isDown) dx += step;
-    if (this.cursors.up.isDown)    dy -= step;
-    if (this.cursors.down.isDown)  dy += step;
+    const quizOpen = this.activeQuiz && this.activeQuiz.isOpen;
+    if (!quizOpen) {
+      if (this.cursors.left.isDown)  dx -= step;
+      if (this.cursors.right.isDown) dx += step;
+      if (this.cursors.up.isDown)    dy -= step;
+      if (this.cursors.down.isDown)  dy += step;
+    }
 
     const oldX = this.sophia.x, oldY = this.sophia.y;
     this.tryMove(this.sophia, dx, dy);
@@ -1492,3 +1719,29 @@ const config = {
 };
 
 window.game = new Phaser.Game(config);
+
+window.testQuiz = function () {
+  const top = window.game.scene.getScene('TopDown');
+  if (!top || !top.sys.isActive()) {
+    console.log('TopDown scene not ready yet');
+    return null;
+  }
+  if (top.activeQuiz && top.activeQuiz.isOpen) {
+    console.log('Quiz already open — dismissing previous');
+    top.activeQuiz.dismiss();
+  }
+  const questions = [
+    { question: 'What is 3 + 4?', answers: ['5', '6', '7', '8'], correctIndex: 2 },
+    { question: 'How many legs does a spider have?', answers: ['4', '6', '8', '10'], correctIndex: 2 },
+    { question: 'What sound does a cat make?', answers: ['Woof', 'Meow', 'Moo', 'Tweet'], correctIndex: 1 },
+    { question: 'What colour is the sky on a sunny day?', answers: ['Red', 'Green', 'Blue', 'Yellow'], correctIndex: 2 },
+    { question: 'What is 10 - 4?', answers: ['4', '5', '6', '7'], correctIndex: 2 }
+  ];
+  const q = new QuizManager(top, questions, {
+    onComplete: () => console.log('[testQuiz] complete'),
+    onWrong: (i) => console.log('[testQuiz] wrong answer', i)
+  });
+  q.start();
+  window._currentQuiz = q;
+  return q;
+};
