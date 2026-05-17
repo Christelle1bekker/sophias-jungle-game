@@ -254,7 +254,7 @@ const STOP_CONFIGS = {
     hintText: "You can do it! 🦀"
   },
   snake: {
-    id: 'snake', built: false, displayName: 'Snake', puzzleKey: 'snakeKnots',
+    id: 'snake', built: true, displayName: 'Snake', puzzleKey: 'snakeKnots',
     nextActKey: 'act4', nextStopId: 'bat', partyItemKey: 'stones',
     puzzleBank: () => PATTERN_QUESTIONS_DEFAULT,
     sceneBuilder: 'buildSnakeScene', celebrationBuilder: 'celebrateSnake',
@@ -1378,6 +1378,136 @@ class StopScene extends Phaser.Scene {
         onComplete: () => drop.destroy()
       });
     }
+  }
+
+  // ====================================================
+  // Stop 3 — Knotted snake
+  // ====================================================
+  buildSnakeScene() {
+    this.add.rectangle(400, 100, 2000, 220, 0x81d4fa).setScrollFactor(0);
+    this.add.rectangle(400, 240, 2000, 80, 0xb3e5fc).setScrollFactor(0);
+    this.add.rectangle(400, 305, 2000, 50, 0xd4eeff).setScrollFactor(0);
+
+    this.add.circle(620, 110, 50, 0xfff9c4, 0.4).setScrollFactor(0.05);
+    this.add.circle(620, 110, 35, 0xffeb3b, 0.95).setScrollFactor(0.05);
+
+    for (let i = 0; i < 3; i++) {
+      const cx = -200 + i * 400 + Phaser.Math.Between(-30, 30);
+      this.add.ellipse(cx, 150 + Phaser.Math.Between(-20, 20), 140, 26, 0xffffff, 0.7).setScrollFactor(0.1);
+    }
+
+    for (let i = 0; i < 11; i++) {
+      const tx = -300 + i * 170 + Phaser.Math.Between(-30, 30);
+      this.add.circle(tx, 340, Phaser.Math.Between(45, 75), 0x1a4d2e).setScrollFactor(0.3);
+    }
+    for (let i = 0; i < 9; i++) {
+      const tx = -200 + i * 200 + Phaser.Math.Between(-30, 30);
+      this.add.circle(tx, 380, Phaser.Math.Between(50, 80), 0x2e7d32).setScrollFactor(0.45);
+    }
+
+    const treeX = 400;
+    this.add.ellipse(treeX, 600, 200, 30, 0x000000, 0.3).setScrollFactor(1);
+    this.add.rectangle(treeX, 600, 90, 540, 0x8b5a2b).setScrollFactor(1).setOrigin(0.5, 1);
+    this.add.rectangle(treeX - 18, 600, 24, 540, 0x6b4423).setScrollFactor(1).setOrigin(0.5, 1);
+    this.add.rectangle(treeX + 26, 600, 8, 540, 0xa67248).setScrollFactor(1).setOrigin(0.5, 1);
+    this.add.rectangle(treeX - 60, 320, 50, 12, 0x8b5a2b).setScrollFactor(1).setRotation(-0.3);
+    this.add.rectangle(treeX + 60, 200, 50, 12, 0x8b5a2b).setScrollFactor(1).setRotation(0.3);
+    this.add.rectangle(treeX - 70, 130, 60, 12, 0x8b5a2b).setScrollFactor(1).setRotation(-0.4);
+    this.add.circle(treeX - 30, 80, 60, 0x1b5e20).setScrollFactor(1);
+    this.add.circle(treeX + 30, 80, 55, 0x2e7d32).setScrollFactor(1);
+    this.add.circle(treeX, 50, 60, 0x4caf50).setScrollFactor(1);
+    this.add.circle(treeX - 70, 100, 45, 0x66bb6a).setScrollFactor(1);
+    this.add.circle(treeX + 70, 100, 45, 0x388e3c).setScrollFactor(1);
+    this.add.ellipse(treeX + 12, 480, 16, 22, 0x2a1810).setScrollFactor(1);
+    this.add.ellipse(treeX + 12, 480, 10, 16, 0x000000).setScrollFactor(1);
+
+    this.snakeChar = this.makeSnakeCharacter(treeX, 280);
+  }
+
+  makeSnakeCharacter(x, y) {
+    const c = this.add.container(x, y);
+    c.setScrollFactor(1);
+    this.snakeKnotSegments = [];
+    const positions = [
+      { x: -50, y: 70 },
+      { x: -20, y: 50 },
+      { x: 30, y: 40 },
+      { x: 50, y: 0 },
+      { x: 10, y: -20 },
+      { x: -30, y: -10 },
+      { x: -40, y: 30 },
+      { x: 0, y: 40 },
+      { x: 40, y: 60 },
+      { x: 70, y: 80 }
+    ];
+    for (let i = 0; i < positions.length; i++) {
+      const p = positions[i];
+      const seg = this.add.circle(p.x, p.y, 14 - i * 0.3, 0x66bb6a);
+      const segShade = this.add.ellipse(p.x, p.y + 3, (12 - i * 0.3) * 2, 4, 0x2e7d32);
+      c.add([seg, segShade]);
+      this.snakeKnotSegments.push({ seg, shade: segShade, knotX: p.x, knotY: p.y, unknotX: -120 + i * 30, unknotY: 50 });
+    }
+    const headX = 70, headY = 80;
+    this.snakeHead = this.add.circle(headX, headY, 16, 0x66bb6a);
+    const headShade = this.add.ellipse(headX, headY + 4, 26, 5, 0x2e7d32);
+    this.snakeEyeL = this.add.circle(headX + 4, headY - 6, 5, 0xffffff);
+    this.snakeEyeR = this.add.circle(headX + 12, headY - 4, 5, 0xffffff);
+    this.snakeEyePupilL = this.add.circle(headX + 5, headY - 6, 2.5, 0x2a2a2a);
+    this.snakeEyePupilR = this.add.circle(headX + 13, headY - 4, 2.5, 0x2a2a2a);
+    this.snakeTongue = this.add.rectangle(headX + 18, headY, 8, 2, 0xe53935);
+    c.add([this.snakeHead, headShade, this.snakeEyeL, this.snakeEyeR, this.snakeEyePupilL, this.snakeEyePupilR, this.snakeTongue]);
+    this.tweens.add({
+      targets: this.snakeTongue,
+      scaleX: { from: 1, to: 1.3 },
+      duration: 400,
+      yoyo: true,
+      repeat: -1
+    });
+    this.tweens.add({
+      targets: [this.snakeEyePupilL, this.snakeEyePupilR],
+      x: '+=2',
+      duration: 700,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+    return c;
+  }
+
+  celebrateSnake(onComplete) {
+    const banner = this.makeWinBanner(this.config.winBannerText);
+    playFanfare();
+    for (let i = 0; i < this.snakeKnotSegments.length; i++) {
+      const s = this.snakeKnotSegments[i];
+      this.tweens.add({
+        targets: [s.seg, s.shade],
+        x: s.unknotX,
+        y: s.unknotY + (s === this.snakeKnotSegments[0] ? 0 : 0),
+        duration: 1200,
+        delay: i * 80,
+        ease: 'Sine.easeInOut'
+      });
+    }
+    this.tweens.add({
+      targets: [this.snakeHead, this.snakeEyeL, this.snakeEyeR, this.snakeEyePupilL, this.snakeEyePupilR, this.snakeTongue],
+      x: '+=' + (180),
+      duration: 1300,
+      ease: 'Sine.easeInOut'
+    });
+    this.spawnSparkles(400, 280, 24);
+    this.time.delayedCall(1400, () => {
+      this.tweens.add({
+        targets: this.snakeChar,
+        y: this.snakeChar.y + 200,
+        duration: 1200,
+        ease: 'Sine.easeInOut'
+      });
+    });
+    this.spawnConfetti(60);
+    this.time.delayedCall(2800, () => {
+      this.updateBanner(banner, this.config.completeBannerText);
+    });
+    this.scheduleContinue(onComplete, 4800);
   }
 }
 
