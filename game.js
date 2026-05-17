@@ -276,7 +276,7 @@ const STOP_CONFIGS = {
     hintText: "Try again, friend! 🦇"
   },
   parrot: {
-    id: 'parrot', built: false, displayName: 'Parrot', puzzleKey: 'parrotStory',
+    id: 'parrot', built: true, displayName: 'Parrot', puzzleKey: 'parrotStory',
     nextActKey: null, nextStopId: null, partyItemKey: null,
     puzzleBank: () => READING_QUESTIONS_DEFAULT,
     sceneBuilder: 'buildParrotScene', celebrationBuilder: 'celebrateParrotFinale',
@@ -1659,6 +1659,305 @@ class StopScene extends Phaser.Scene {
     });
     this.scheduleContinue(onComplete, 4800);
   }
+
+  // ====================================================
+  // Stop 5 — Lost parrot (FINALE)
+  // ====================================================
+  buildParrotScene() {
+    // Beautiful sunset gradient
+    this.add.rectangle(400, 50, 2000, 100, 0x3a1a4a).setScrollFactor(0);
+    this.add.rectangle(400, 130, 2000, 60, 0x7b1fa2).setScrollFactor(0);
+    this.add.rectangle(400, 180, 2000, 50, 0xc2185b).setScrollFactor(0);
+    this.add.rectangle(400, 225, 2000, 40, 0xef5350).setScrollFactor(0);
+    this.add.rectangle(400, 260, 2000, 30, 0xff7043).setScrollFactor(0);
+    this.add.rectangle(400, 290, 2000, 30, 0xff9800).setScrollFactor(0);
+    this.add.rectangle(400, 320, 2000, 25, 0xffb74d).setScrollFactor(0);
+
+    // Sun on horizon
+    this.add.circle(400, 340, 90, 0xff5722, 0.35).setScrollFactor(0.08);
+    this.add.circle(400, 340, 65, 0xff7043, 0.85).setScrollFactor(0.08);
+    this.add.circle(400, 340, 45, 0xff9800).setScrollFactor(0.08);
+    this.add.circle(395, 335, 18, 0xffffff, 0.6).setScrollFactor(0.08);
+
+    // Soft cloud wisps
+    for (let i = 0; i < 4; i++) {
+      const cx = -200 + i * 320 + Phaser.Math.Between(-30, 30);
+      const cy = 130 + Phaser.Math.Between(-15, 25);
+      this.add.ellipse(cx, cy, 180, 22, 0xff7043, 0.6).setScrollFactor(0.08);
+      this.add.ellipse(cx + 30, cy + 5, 120, 16, 0xff9800, 0.55).setScrollFactor(0.08);
+    }
+
+    // Distant mountains
+    for (let i = 0; i < 7; i++) {
+      const mx = -300 + i * 230 + Phaser.Math.Between(-20, 20);
+      const mh = Phaser.Math.Between(70, 140);
+      this.add.triangle(mx, 360, 0, 0, 220, 0, 110, -mh, 0x4a2c5a).setScrollFactor(0.15);
+    }
+
+    // Mid jungle clearing
+    for (let i = 0; i < 9; i++) {
+      const tx = -200 + i * 180 + Phaser.Math.Between(-30, 30);
+      this.add.circle(tx, 400, Phaser.Math.Between(45, 70), 0x2a4a3a).setScrollFactor(0.35);
+    }
+
+    // Ground (clearing)
+    this.add.rectangle(400, 560, 2000, 120, 0x4a7a3a).setScrollFactor(1);
+    this.add.rectangle(400, 510, 2000, 30, 0x66bb6a, 0.5).setScrollFactor(1);
+
+    // Petals scattered
+    for (let i = 0; i < 18; i++) {
+      const px = Phaser.Math.Between(-100, 900);
+      const py = 520 + Phaser.Math.Between(0, 50);
+      const c = Phaser.Math.RND.pick([0xff5e7e, 0xffeb3b, 0xb967ff, 0xff8e3c]);
+      this.add.circle(px, py, Phaser.Math.Between(3, 6), c).setScrollFactor(1);
+    }
+
+    // Perch (a vertical tree stump in the middle)
+    const perchX = 400, perchY = 470;
+    this.add.ellipse(perchX, 540, 50, 14, 0x000000, 0.4).setScrollFactor(1);
+    this.add.rectangle(perchX, 540, 36, 80, 0x6b4423).setScrollFactor(1).setOrigin(0.5, 1);
+    this.add.rectangle(perchX - 6, 540, 8, 80, 0x4a2c1a).setScrollFactor(1).setOrigin(0.5, 1);
+    this.add.ellipse(perchX, 460, 50, 16, 0x8b5a2b).setScrollFactor(1);
+    this.add.ellipse(perchX, 458, 40, 12, 0xa67248).setScrollFactor(1);
+
+    this.parrotChar = this.makeParrotCharacter(perchX, perchY - 30);
+
+    // Containers for finale characters (added later in celebration)
+    this.finaleAnimals = [];
+  }
+
+  makeParrotCharacter(x, y) {
+    const c = this.add.container(x, y);
+    c.setScrollFactor(1);
+    const body = this.add.ellipse(0, 6, 30, 42, 0x42a5f5);
+    const bodyShade = this.add.ellipse(0, 16, 24, 10, 0x1976d2);
+    const wing = this.add.ellipse(-8, 4, 18, 28, 0x1976d2);
+    const tail = this.add.ellipse(0, 28, 14, 16, 0x0d47a1);
+    const head = this.add.circle(0, -12, 16, 0x42a5f5);
+    const headShade = this.add.ellipse(0, -8, 22, 6, 0x1976d2);
+    const eyeBase = this.add.circle(6, -14, 5, 0xffffff);
+    const eye = this.add.circle(7, -14, 3, 0x2a2a2a);
+    this.parrotEyeHi = this.add.circle(8, -15, 1, 0xffffff);
+    const beak = this.add.triangle(13, -10, 0, -3, 0, 3, 10, 0, 0xffa726);
+    const beakLower = this.add.triangle(13, -8, 0, 0, 0, 5, 8, 2, 0xff9800);
+    const plume = this.add.ellipse(-3, -24, 4, 10, 0xff5e7e);
+    const plume2 = this.add.ellipse(2, -25, 4, 10, 0xffeb3b);
+    const plume3 = this.add.ellipse(7, -23, 4, 10, 0x66bb6a);
+    this.parrotTear = this.add.circle(4, -8, 2, 0x42a5f5, 0.9);
+    c.add([tail, wing, body, bodyShade, head, headShade, eyeBase, eye, this.parrotEyeHi, beak, beakLower, plume, plume2, plume3, this.parrotTear]);
+    this.tweens.add({
+      targets: c,
+      y: y - 4,
+      duration: 1500,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+    this.tweens.add({
+      targets: this.parrotTear,
+      y: '+=8',
+      alpha: { from: 0.9, to: 0 },
+      duration: 1800,
+      repeat: -1,
+      ease: 'Sine.easeIn'
+    });
+    return c;
+  }
+
+  celebrateParrotFinale(onComplete) {
+    const banner = this.makeWinBanner(this.config.winBannerText);
+    playFanfare();
+    if (this.parrotTear) this.parrotTear.alpha = 0;
+    // Parrot flies up joyfully
+    this.tweens.add({
+      targets: this.parrotChar,
+      y: this.parrotChar.y - 80,
+      duration: 800,
+      ease: 'Sine.easeOut'
+    });
+    this.tweens.add({
+      targets: this.parrotChar,
+      angle: { from: -10, to: 10 },
+      duration: 200,
+      yoyo: true,
+      repeat: 6
+    });
+    // Spawn all animals gathering
+    this.time.delayedCall(900, () => this.spawnFinaleAnimals());
+    // Confetti rain (heavier than other stops)
+    this.spawnConfetti(120);
+    // Fireworks bursts
+    this.time.delayedCall(1500, () => this.spawnFireworks());
+    this.time.delayedCall(2500, () => this.spawnFireworks());
+    this.time.delayedCall(3300, () => this.spawnFireworks());
+    // Golden Banana descends
+    this.time.delayedCall(2200, () => this.spawnGoldenBanana());
+    // Update banner to "PARTY TIME!"
+    this.time.delayedCall(3600, () => {
+      this.updateBanner(banner, '🎊 PARTY TIME! 🎊');
+    });
+    // Final banner
+    this.time.delayedCall(5500, () => {
+      this.updateBanner(banner, this.config.completeBannerText);
+    });
+    this.scheduleContinue(onComplete, 7500);
+  }
+
+  spawnFinaleAnimals() {
+    const ground = 530;
+    // Snowy (white rat)
+    const snowy = this.makeFinaleRat(180, ground, 0xf5f5f5, 0xffc4c4);
+    // Midnight (black rat)
+    const midnight = this.makeFinaleRat(260, ground, 0x2a2a2a, 0xff8888);
+    // Crab
+    const crab = this.makeFinaleCrab(330, ground);
+    // Snake
+    const snake = this.makeFinaleSnake(490, ground);
+    // Bat (in air above)
+    const bat = this.makeFinaleBat(570, ground - 80);
+    this.finaleAnimals.push(snowy, midnight, crab, snake, bat);
+    // Dance: bob up and down
+    for (let i = 0; i < this.finaleAnimals.length; i++) {
+      const a = this.finaleAnimals[i];
+      a.alpha = 0;
+      this.tweens.add({ targets: a, alpha: 1, duration: 400, delay: i * 120 });
+      this.tweens.add({
+        targets: a,
+        y: a.y - 12,
+        duration: 380 + i * 40,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+        delay: 500 + i * 120
+      });
+      this.tweens.add({
+        targets: a,
+        angle: { from: -6, to: 6 },
+        duration: 320,
+        yoyo: true,
+        repeat: -1,
+        delay: 600 + i * 120
+      });
+    }
+  }
+
+  makeFinaleRat(x, y, body, ear) {
+    const c = this.add.container(x, y);
+    c.setScrollFactor(1);
+    c.add(this.add.ellipse(0, 6, 18, 4, 0x000000, 0.35));
+    c.add(this.add.ellipse(0, 0, 26, 18, body));
+    c.add(this.add.circle(11, -1, 8, body));
+    c.add(this.add.circle(13, -7, 3, ear));
+    c.add(this.add.circle(13, 5, 3, ear));
+    c.add(this.add.circle(14, -3, 1.4, 0x2a2a2a));
+    c.add(this.add.circle(14, 3, 1.4, 0x2a2a2a));
+    c.add(this.add.circle(18, 0, 1.6, 0xff8888));
+    return c;
+  }
+
+  makeFinaleCrab(x, y) {
+    const c = this.add.container(x, y);
+    c.setScrollFactor(1);
+    c.add(this.add.ellipse(0, 6, 30, 6, 0x000000, 0.35));
+    c.add(this.add.ellipse(0, 0, 32, 22, 0xef5350));
+    c.add(this.add.circle(-18, -4, 6, 0xef5350));
+    c.add(this.add.circle(18, -4, 6, 0xef5350));
+    c.add(this.add.circle(-5, -8, 2.5, 0xffffff));
+    c.add(this.add.circle(5, -8, 2.5, 0xffffff));
+    c.add(this.add.circle(-5, -8, 1.5, 0x2a2a2a));
+    c.add(this.add.circle(5, -8, 1.5, 0x2a2a2a));
+    return c;
+  }
+
+  makeFinaleSnake(x, y) {
+    const c = this.add.container(x, y);
+    c.setScrollFactor(1);
+    c.add(this.add.ellipse(0, 6, 30, 6, 0x000000, 0.35));
+    for (let i = 0; i < 5; i++) {
+      c.add(this.add.circle(-12 + i * 6, Math.sin(i) * 4, 7, 0x66bb6a));
+    }
+    c.add(this.add.circle(20, 0, 10, 0x66bb6a));
+    c.add(this.add.circle(23, -3, 2, 0xffffff));
+    c.add(this.add.circle(23, 3, 2, 0xffffff));
+    c.add(this.add.circle(23, -3, 1, 0x2a2a2a));
+    c.add(this.add.circle(23, 3, 1, 0x2a2a2a));
+    return c;
+  }
+
+  makeFinaleBat(x, y) {
+    const c = this.add.container(x, y);
+    c.setScrollFactor(1);
+    c.add(this.add.ellipse(0, 16, 26, 6, 0x000000, 0.35));
+    const wingL = this.add.triangle(-12, 0, 0, 0, 16, -8, 16, 8, 0x424242);
+    const wingR = this.add.triangle(12, 0, 0, 0, -16, -8, -16, 8, 0x424242);
+    c.add([wingL, wingR]);
+    c.add(this.add.ellipse(0, 0, 16, 20, 0x424242));
+    c.add(this.add.circle(0, -10, 9, 0x424242));
+    c.add(this.add.circle(-3, -10, 2, 0xff5722));
+    c.add(this.add.circle(3, -10, 2, 0xff5722));
+    this.tweens.add({ targets: [wingL, wingR], scaleX: 0.4, duration: 200, yoyo: true, repeat: -1 });
+    return c;
+  }
+
+  spawnFireworks() {
+    const cam = this.cameras.main;
+    const fx = Phaser.Math.Between(100, cam.width - 100);
+    const fy = Phaser.Math.Between(120, 280);
+    const color = Phaser.Math.RND.pick([0xff5e7e, 0xffeb3b, 0xa8e6cf, 0xb5d7f0, 0xd5b8e8, 0xff8e3c]);
+    for (let i = 0; i < 24; i++) {
+      const angle = (i / 24) * Math.PI * 2;
+      const star = this.add.star(fx, fy, 4, 3, 8, color).setScrollFactor(0).setDepth(2400);
+      const r = 120;
+      this.tweens.add({
+        targets: star,
+        x: fx + Math.cos(angle) * r,
+        y: fy + Math.sin(angle) * r,
+        scale: { from: 1.5, to: 0 },
+        alpha: { from: 1, to: 0 },
+        duration: 1200,
+        ease: 'Cubic.easeOut',
+        onComplete: () => star.destroy()
+      });
+    }
+  }
+
+  spawnGoldenBanana() {
+    const cam = this.cameras.main;
+    const cx = cam.width / 2;
+    const gb = this.add.container(cx, -60);
+    gb.setScrollFactor(0).setDepth(2500);
+    const glow = this.add.circle(0, 0, 50, 0xffeb3b, 0.4);
+    const glowMid = this.add.circle(0, 0, 35, 0xfff176, 0.7);
+    const body = this.add.ellipse(0, 0, 60, 22, 0xffd54f);
+    const hi = this.add.ellipse(0, -3, 45, 8, 0xfff176);
+    const tip1 = this.add.circle(-30, 0, 5, 0xc9a13d);
+    const tip2 = this.add.circle(30, 0, 5, 0xc9a13d);
+    gb.add([glow, glowMid, body, hi, tip1, tip2]);
+    gb.angle = -25;
+    this.tweens.add({
+      targets: gb,
+      y: 200,
+      duration: 1800,
+      ease: 'Cubic.easeIn'
+    });
+    this.tweens.add({
+      targets: gb,
+      angle: 0,
+      duration: 1800,
+      ease: 'Cubic.easeOut'
+    });
+    this.tweens.add({
+      targets: glow,
+      alpha: { from: 0.4, to: 0.8 },
+      duration: 700,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+    this.time.delayedCall(2000, () => {
+      this.spawnSparkles(cx, 200, 30);
+    });
+  }
 }
 
 class TopDownScene extends Phaser.Scene {
@@ -1839,6 +2138,35 @@ class TopDownScene extends Phaser.Scene {
         ease: 'Cubic.easeOut',
         onComplete: () => puff.destroy()
       });
+    }
+  }
+
+  updatePartyModeConfetti(time) {
+    if (!this.lastConfettiTime || time - this.lastConfettiTime > 1500) {
+      this.lastConfettiTime = time;
+      const cam = this.cameras.main;
+      const cx = this.sophia.x + Phaser.Math.Between(-360, 360);
+      const cy = this.sophia.y - 320;
+      const colors = [0xff5e7e, 0xffeb3b, 0xa8e6cf, 0xb5d7f0, 0xd5b8e8, 0xff8e3c];
+      for (let i = 0; i < 6; i++) {
+        const piece = this.add.rectangle(
+          cx + Phaser.Math.Between(-40, 40),
+          cy,
+          6, 10,
+          Phaser.Math.RND.pick(colors)
+        ).setDepth(950);
+        piece.setAngle(Math.random() * 360);
+        this.tweens.add({
+          targets: piece,
+          y: cy + Phaser.Math.Between(500, 700),
+          x: piece.x + Phaser.Math.Between(-80, 80),
+          angle: piece.angle + 540 * (Math.random() > 0.5 ? 1 : -1),
+          alpha: { from: 0.9, to: 0 },
+          duration: 4000 + Math.random() * 1500,
+          ease: 'Cubic.easeIn',
+          onComplete: () => piece.destroy()
+        });
+      }
     }
   }
 
@@ -2418,6 +2746,9 @@ class TopDownScene extends Phaser.Scene {
     this.updateBreadcrumb(time);
     if (!modalActive) {
       this.handleStopProximityInput();
+    }
+    if (this.partyMode) {
+      this.updatePartyModeConfetti(time);
     }
 
     for (let i = this.bananas.length - 1; i >= 0; i--) {
