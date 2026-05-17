@@ -102,6 +102,14 @@ function numberWord(n) {
   return n >= 0 && n < NUMBER_WORDS.length ? NUMBER_WORDS[n] : n.toString();
 }
 
+const STOP_MARKERS = [
+  { id: 'snowy',  x: 1080, y: 800,  animal: 'rat',    color: 0x6b4423, displayName: 'Snowy',  puzzleKey: 'sumBridge',    prereq: null,     placeholder: "Snowy is being shy this week, she'll come out next time! 🐀" },
+  { id: 'crab',   x: 1200, y: 1500, animal: 'crab',   color: 0xef5350, displayName: 'Crab',   puzzleKey: 'wordTree',     prereq: 'snowy',  placeholder: "The crab is hiding in the sand. Come back soon! 🦀" },
+  { id: 'snake',  x: 1200, y: 590,  animal: 'snake',  color: 0x66bb6a, displayName: 'Snake',  puzzleKey: 'snakeKnots',   prereq: 'crab',   placeholder: "The snake is napping in the leaves. Shhh! 🐍" },
+  { id: 'bat',    x: 2000, y: 380,  animal: 'bat',    color: 0x424242, displayName: 'Bat',    puzzleKey: 'batWing',      prereq: 'snake',  placeholder: "The bat is sleeping in the cave. Don't wake him! 🦇" },
+  { id: 'parrot', x: 400,  y: 200,  animal: 'parrot', color: 0x42a5f5, displayName: 'Parrot', puzzleKey: 'parrotStory',  prereq: 'bat',    placeholder: "The parrot is visiting friends far away. She'll be back! 🦜" }
+];
+
 const SAVE_KEY = 'sophias-rat-jungle-save';
 const DEFAULT_SAVE_STATE = {
   version: 3,
@@ -584,6 +592,13 @@ class TopDownScene extends Phaser.Scene {
     this.activeBubble = null;
 
     this.makeComingSoonSign(1100, 320);
+
+    this.activeQuiz = null;
+    this.placeholderOpen = false;
+    this.stopMarkers = [];
+    this.breadcrumbGraphics = this.add.graphics().setDepth(40);
+    this.pathHighlightUntil = 0;
+    this.buildStopMarkers();
 
     this.caveDim = this.add.rectangle(400, 300, 800, 600, 0x080820)
       .setAlpha(0)
@@ -1136,7 +1151,8 @@ class TopDownScene extends Phaser.Scene {
     const step = SOPHIA_SPEED * (delta / 1000);
     let dx = 0, dy = 0;
     const quizOpen = this.activeQuiz && this.activeQuiz.isOpen;
-    if (!quizOpen) {
+    const modalActive = quizOpen || this.placeholderOpen;
+    if (!modalActive) {
       if (this.cursors.left.isDown)  dx -= step;
       if (this.cursors.right.isDown) dx += step;
       if (this.cursors.up.isDown)    dy -= step;
@@ -1177,6 +1193,12 @@ class TopDownScene extends Phaser.Scene {
 
     if (nearest && Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
       this.enterPeek(nearest.id, nearest.x, nearest.y);
+    }
+
+    this.updateStopMarkers(time);
+    this.updateBreadcrumb(time);
+    if (!modalActive) {
+      this.handleStopProximityInput();
     }
 
     for (let i = this.bananas.length - 1; i >= 0; i--) {
@@ -1377,6 +1399,419 @@ class TopDownScene extends Phaser.Scene {
       strokeThickness: 2,
       fontStyle: 'italic'
     }).setOrigin(0.5, 0.5);
+  }
+
+  buildStopMarkers() {
+    for (const spec of STOP_MARKERS) {
+      this.stopMarkers.push(this.makeStopMarker(spec));
+    }
+  }
+
+  isStopUnlocked(stopSpec) {
+    if (!stopSpec.prereq) return true;
+    const save = SaveManager.load();
+    const prereqSpec = STOP_MARKERS.find(s => s.id === stopSpec.prereq);
+    if (!prereqSpec) return true;
+    return save.puzzlesSolved[prereqSpec.puzzleKey] === true;
+  }
+
+  makeStopMarker(spec) {
+    const unlocked = this.isStopUnlocked(spec);
+    const c = this.add.container(spec.x, spec.y);
+    c.setDepth(60);
+
+    const groundShadow = this.add.ellipse(0, 16, 50, 10, 0x000000, 0.35);
+
+    const outerGlow = this.add.circle(0, 0, 38, 0xffeb3b, 0.0);
+    const midGlow = this.add.circle(0, 0, 30, 0xffeb3b, 0.0);
+
+    const padBase = this.add.ellipse(0, 4, 50, 14, 0x4a2c1a);
+    const padTop = this.add.circle(0, 0, 22, unlocked ? 0xfff3a8 : 0x9a9a9a);
+    const padRim = this.add.circle(0, 0, 22, 0x000000, 0).setStrokeStyle(2, unlocked ? 0xc9a13d : 0x666666);
+
+    const silhouetteColor = unlocked ? spec.color : 0x666666;
+    const silhouetteParts = this.makeAnimalSilhouette(spec.animal, silhouetteColor);
+
+    const lockedRing = this.add.circle(0, -2, 12, 0x222222, unlocked ? 0 : 0.6);
+    const lockedQuestion = this.add.text(0, -2, '?', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '18px',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 3,
+      fontStyle: 'bold'
+    }).setOrigin(0.5, 0.5).setAlpha(unlocked ? 0 : 0.95);
+
+    const sparkle = unlocked
+      ? this.add.star(0, -28, 5, 2, 4, 0xffffff).setAlpha(0.85)
+      : null;
+
+    const elements = [groundShadow, outerGlow, midGlow, padBase, padTop, padRim, ...silhouetteParts, lockedRing, lockedQuestion];
+    if (sparkle) elements.push(sparkle);
+    c.add(elements);
+
+    if (unlocked) {
+      this.tweens.add({
+        targets: outerGlow,
+        scale: { from: 0.85, to: 1.25 },
+        alpha: { from: 0.35, to: 0.0 },
+        duration: 1500,
+        yoyo: true,
+        repeat: -1
+      });
+      this.tweens.add({
+        targets: midGlow,
+        alpha: { from: 0.5, to: 0.15 },
+        duration: 900,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut'
+      });
+    }
+
+    padTop.setInteractive(new Phaser.Geom.Circle(0, 0, 26), Phaser.Geom.Circle.Contains);
+    padTop.on('pointerdown', () => {
+      if (this.placeholderOpen || (this.activeQuiz && this.activeQuiz.isOpen)) return;
+      if (this.isStopUnlocked(spec)) this.showStopPlaceholder(spec);
+      else this.showLockedToast(spec);
+    });
+
+    return {
+      spec,
+      container: c,
+      outerGlow,
+      midGlow,
+      padTop,
+      sparkle,
+      sparkleOffset: Math.random() * Math.PI * 2,
+      unlocked,
+      nearPulseScale: 1
+    };
+  }
+
+  makeAnimalSilhouette(animal, color) {
+    switch (animal) {
+      case 'rat':    return this.makeRatSilhouette(color);
+      case 'crab':   return this.makeCrabSilhouette(color);
+      case 'snake':  return this.makeSnakeSilhouette(color);
+      case 'bat':    return this.makeBatSilhouette(color);
+      case 'parrot': return this.makeParrotSilhouette(color);
+      default: return [];
+    }
+  }
+
+  makeRatSilhouette(color) {
+    return [
+      this.add.ellipse(-2, -1, 18, 11, color),
+      this.add.circle(6, -1, 5, color),
+      this.add.circle(8, -4, 2, color),
+      this.add.circle(8, 2, 2, color),
+      this.add.circle(10, -1, 1.2, 0xffffff)
+    ];
+  }
+
+  makeCrabSilhouette(color) {
+    return [
+      this.add.ellipse(0, 0, 18, 11, color),
+      this.add.circle(-10, -2, 4, color),
+      this.add.circle(10, -2, 4, color),
+      this.add.rectangle(-12, -2, 2, 5, color),
+      this.add.rectangle(12, -2, 2, 5, color),
+      this.add.rectangle(-5, 6, 2, 4, color),
+      this.add.rectangle(0, 6, 2, 4, color),
+      this.add.rectangle(5, 6, 2, 4, color),
+      this.add.circle(-3, -2, 1, 0xffffff),
+      this.add.circle(3, -2, 1, 0xffffff)
+    ];
+  }
+
+  makeSnakeSilhouette(color) {
+    return [
+      this.add.circle(-8, -4, 4, color),
+      this.add.circle(-3, -2, 4, color),
+      this.add.circle(2, 1, 4, color),
+      this.add.circle(7, -1, 4, color),
+      this.add.circle(11, -3, 4.5, color),
+      this.add.circle(12, -4, 1, 0xffffff),
+      this.add.rectangle(14, -1, 3, 1, 0xe53935)
+    ];
+  }
+
+  makeBatSilhouette(color) {
+    return [
+      this.add.ellipse(0, 0, 7, 11, color),
+      this.add.triangle(-9, -1, 0, -4, 9, -2, 0, 4, color),
+      this.add.triangle(9, -1, 0, -4, -9, -2, 0, 4, color),
+      this.add.circle(0, -7, 4, color),
+      this.add.circle(-1.5, -7, 1, 0xff0000),
+      this.add.circle(1.5, -7, 1, 0xff0000)
+    ];
+  }
+
+  makeParrotSilhouette(color) {
+    return [
+      this.add.ellipse(-2, 2, 11, 14, color),
+      this.add.circle(3, -4, 5, color),
+      this.add.triangle(8, -3, 0, -2, 0, 3, 6, 0, 0xffa726),
+      this.add.ellipse(-1, -8, 3, 6, color),
+      this.add.ellipse(-9, 4, 8, 5, color),
+      this.add.circle(4, -5, 1.2, 0xffffff)
+    ];
+  }
+
+  updateStopMarkers(time) {
+    for (const m of this.stopMarkers) {
+      if (m.sparkle) {
+        const a = time / 700 + m.sparkleOffset;
+        m.sparkle.x = Math.cos(a) * 26;
+        m.sparkle.y = -8 + Math.sin(a) * 14;
+        m.sparkle.angle = a * 60;
+      }
+    }
+  }
+
+  updateBreadcrumb(time) {
+    this.breadcrumbGraphics.clear();
+    const target = this.findNextStop();
+    if (!target) return;
+    const x1 = this.sophia.x, y1 = this.sophia.y;
+    const x2 = target.spec.x, y2 = target.spec.y;
+    const dist = Math.hypot(x2 - x1, y2 - y1);
+    if (dist < 90) return;
+
+    const highlighted = time < this.pathHighlightUntil;
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    const startOffset = 40, endOffset = 40;
+    const usable = dist - startOffset - endOffset;
+    if (usable <= 0) return;
+    const spacing = 22;
+    const dotCount = Math.floor(usable / spacing);
+    const baseAlpha = highlighted ? 0.9 : 0.3;
+    const baseRadius = highlighted ? 5 : 3;
+    const color = highlighted ? 0xffeb3b : 0xfff176;
+    for (let i = 0; i <= dotCount; i++) {
+      const t = startOffset + i * spacing;
+      const px = x1 + Math.cos(angle) * t;
+      const py = y1 + Math.sin(angle) * t;
+      const flow = (time / 250 - i * 0.4) % (Math.PI * 2);
+      const a = baseAlpha * (0.55 + 0.45 * Math.max(0, Math.sin(flow)));
+      this.breadcrumbGraphics.fillStyle(color, a);
+      this.breadcrumbGraphics.fillCircle(px, py, baseRadius);
+    }
+  }
+
+  findNextStop() {
+    const save = SaveManager.load();
+    for (const m of this.stopMarkers) {
+      if (!this.isStopUnlocked(m.spec)) continue;
+      if (save.puzzlesSolved[m.spec.puzzleKey]) continue;
+      return m;
+    }
+    return null;
+  }
+
+  handleStopProximityInput() {
+    let nearest = null;
+    let nearestDist = Infinity;
+    for (const m of this.stopMarkers) {
+      const d = Math.hypot(m.spec.x - this.sophia.x, m.spec.y - this.sophia.y);
+      if (d < 60 && d < nearestDist) { nearest = m; nearestDist = d; }
+      const targetScale = (d < 60) ? 1.18 : 1.0;
+      m.container.scale += (targetScale - m.container.scale) * 0.12;
+    }
+    if (nearest && Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+      if (this.isStopUnlocked(nearest.spec)) this.showStopPlaceholder(nearest.spec);
+      else this.showLockedToast(nearest.spec);
+    }
+  }
+
+  markStopUnlocked(stopId) {
+    const m = this.stopMarkers.find(x => x.spec.id === stopId);
+    if (!m) return;
+    m.unlocked = true;
+    this.pathHighlightUntil = this.scene.systems.game.getTime() + 3000;
+  }
+
+  showStopPlaceholder(spec) {
+    if (this.placeholderOpen) return;
+    this.placeholderOpen = true;
+    const cam = this.cameras.main;
+    const cw = cam.width, ch = cam.height;
+    const cx = cw / 2, cy = ch / 2;
+
+    const overlay = this.add.rectangle(cx, cy, cw, ch, 0x000000, 0.55)
+      .setScrollFactor(0).setDepth(2000).setInteractive();
+    const shadow = this.add.rectangle(cx + 6, cy + 8, 560, 300, 0x000000, 0.3)
+      .setScrollFactor(0).setDepth(2001);
+    const card = this.add.rectangle(cx, cy, 560, 300, 0xfffaf0)
+      .setStrokeStyle(4, 0x4a2c1a)
+      .setScrollFactor(0).setDepth(2001);
+
+    const titleY = cy - 105;
+    const title = this.add.text(cx, titleY, spec.displayName + "'s stop", {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '20px',
+      color: '#6b4423',
+      fontStyle: 'bold'
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2002);
+
+    const text = this.add.text(cx, cy - 25, spec.placeholder, {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '22px',
+      color: '#2a2a2a',
+      fontStyle: 'bold',
+      align: 'center',
+      wordWrap: { width: 480 }
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2002);
+
+    const hint = this.add.text(cx, cy + 110, 'Tap anywhere to close', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '13px',
+      color: '#8b6f3a',
+      fontStyle: 'italic'
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2002);
+
+    const animationParts = this.makeStopPlaceholderAnimation(spec.animal, cx, cy + 60);
+
+    const elements = [overlay, shadow, card, title, text, hint, ...animationParts];
+
+    let dismissed = false;
+    const keyHandler = (e) => {
+      if (dismissed) return;
+      e.preventDefault();
+      dismiss();
+    };
+    const dismiss = () => {
+      if (dismissed) return;
+      dismissed = true;
+      window.removeEventListener('keydown', keyHandler);
+      elements.forEach(el => { if (el && el.destroy) el.destroy(); });
+      this.placeholderOpen = false;
+    };
+    overlay.on('pointerdown', dismiss);
+    card.setInteractive().on('pointerdown', dismiss);
+    window.addEventListener('keydown', keyHandler);
+  }
+
+  showLockedToast(spec) {
+    if (this.placeholderOpen) return;
+    this.placeholderOpen = true;
+    const cam = this.cameras.main;
+    const cw = cam.width, ch = cam.height;
+    const cx = cw / 2, cy = ch / 2;
+
+    const prereqSpec = STOP_MARKERS.find(s => s.id === spec.prereq);
+    const prereqName = prereqSpec ? prereqSpec.displayName : 'the first animal';
+    const msg = 'Not yet! Help ' + prereqName + ' first.';
+
+    const overlay = this.add.rectangle(cx, cy, cw, ch, 0x000000, 0.4)
+      .setScrollFactor(0).setDepth(2000).setInteractive();
+    const card = this.add.rectangle(cx, cy, 480, 140, 0xfffaf0)
+      .setStrokeStyle(4, 0x4a2c1a)
+      .setScrollFactor(0).setDepth(2001);
+    const text = this.add.text(cx, cy - 10, msg, {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '22px',
+      color: '#4a2c1a',
+      fontStyle: 'bold',
+      align: 'center',
+      wordWrap: { width: 440 }
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2002);
+    const hint = this.add.text(cx, cy + 40, 'Tap to close', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '13px',
+      color: '#8b6f3a',
+      fontStyle: 'italic'
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2002);
+
+    const elements = [overlay, card, text, hint];
+    let dismissed = false;
+    const keyHandler = (e) => { if (dismissed) return; e.preventDefault(); dismiss(); };
+    const dismiss = () => {
+      if (dismissed) return;
+      dismissed = true;
+      window.removeEventListener('keydown', keyHandler);
+      elements.forEach(el => { if (el && el.destroy) el.destroy(); });
+      this.placeholderOpen = false;
+    };
+    overlay.on('pointerdown', dismiss);
+    card.setInteractive().on('pointerdown', dismiss);
+    window.addEventListener('keydown', keyHandler);
+  }
+
+  makeStopPlaceholderAnimation(animal, cx, cy) {
+    const parts = [];
+    if (animal === 'rat') {
+      for (let i = 0; i < 5; i++) {
+        const leaf = this.add.ellipse(cx - 200 + i * 40, cy, 10, 5, 0x66bb6a).setScrollFactor(0).setDepth(2003);
+        leaf.angle = Phaser.Math.Between(-30, 30);
+        this.tweens.add({
+          targets: leaf,
+          x: leaf.x + 220,
+          y: leaf.y + Phaser.Math.Between(-15, 15),
+          angle: leaf.angle + 360,
+          duration: 4000 + i * 600,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+        parts.push(leaf);
+      }
+    } else if (animal === 'crab') {
+      for (let i = 0; i < 6; i++) {
+        const puff = this.add.circle(cx - 100 + i * 40, cy + 10, 6, 0xddc89a, 0.0).setScrollFactor(0).setDepth(2003);
+        this.tweens.add({
+          targets: puff,
+          y: cy - 20,
+          alpha: { from: 0.6, to: 0 },
+          scale: { from: 0.6, to: 1.4 },
+          duration: 1400,
+          delay: i * 250,
+          repeat: -1,
+          ease: 'Cubic.easeOut'
+        });
+        parts.push(puff);
+      }
+    } else if (animal === 'snake') {
+      const leaf = this.add.ellipse(cx, cy, 60, 22, 0x66bb6a).setScrollFactor(0).setDepth(2003);
+      const stem = this.add.rectangle(cx, cy + 12, 3, 18, 0x4a6b2c).setScrollFactor(0).setDepth(2003);
+      this.tweens.add({
+        targets: [leaf, stem],
+        angle: { from: -12, to: 12 },
+        duration: 1800,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut'
+      });
+      parts.push(leaf, stem);
+    } else if (animal === 'bat') {
+      const mouth = this.add.ellipse(cx, cy, 80, 40, 0x000000, 0.7).setScrollFactor(0).setDepth(2003);
+      const mouthInner = this.add.ellipse(cx, cy + 4, 60, 30, 0x000000, 0.9).setScrollFactor(0).setDepth(2003);
+      this.tweens.add({
+        targets: [mouth, mouthInner],
+        alpha: { from: 0.5, to: 0.95 },
+        duration: 1600,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut'
+      });
+      parts.push(mouth, mouthInner);
+    } else if (animal === 'parrot') {
+      for (let i = 0; i < 3; i++) {
+        const feather = this.add.ellipse(cx - 80 + i * 80, cy - 30, 8, 16, 0x42a5f5).setScrollFactor(0).setDepth(2003);
+        feather.angle = -15;
+        this.tweens.add({
+          targets: feather,
+          y: cy + 30,
+          x: feather.x + Phaser.Math.Between(-15, 15),
+          angle: { from: -25, to: 25 },
+          duration: 3000 + i * 800,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+        parts.push(feather);
+      }
+    }
+    return parts;
   }
 
   enterPeek(spotId, sx, sy) {
