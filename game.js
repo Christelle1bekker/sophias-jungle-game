@@ -265,7 +265,7 @@ const STOP_CONFIGS = {
     hintText: "No rush, darling! 🐍"
   },
   bat: {
-    id: 'bat', built: false, displayName: 'Bat', puzzleKey: 'batWing',
+    id: 'bat', built: true, displayName: 'Bat', puzzleKey: 'batWing',
     nextActKey: 'act5', nextStopId: 'parrot', partyItemKey: 'musicNotes',
     puzzleBank: () => COUNTING_QUESTIONS_DEFAULT,
     sceneBuilder: 'buildBatScene', celebrationBuilder: 'celebrateBat',
@@ -1501,6 +1501,156 @@ class StopScene extends Phaser.Scene {
         y: this.snakeChar.y + 200,
         duration: 1200,
         ease: 'Sine.easeInOut'
+      });
+    });
+    this.spawnConfetti(60);
+    this.time.delayedCall(2800, () => {
+      this.updateBanner(banner, this.config.completeBannerText);
+    });
+    this.scheduleContinue(onComplete, 4800);
+  }
+
+  // ====================================================
+  // Stop 4 — Bat with hurt wing
+  // ====================================================
+  buildBatScene() {
+    this.add.rectangle(400, 300, 2000, 600, 0x0a0820).setScrollFactor(0);
+    this.add.rectangle(400, 300, 2000, 600, 0x1a103a, 0.6).setScrollFactor(0);
+
+    // Far cave wall (parallax 0.15)
+    for (let i = 0; i < 14; i++) {
+      const rx = -300 + i * 130 + Phaser.Math.Between(-15, 15);
+      const ry = Phaser.Math.Between(100, 480);
+      this.add.circle(rx, ry, Phaser.Math.Between(40, 80), 0x2a1a3a, 0.6).setScrollFactor(0.15);
+    }
+
+    // Distant cave mouth light (faint warm glow)
+    this.add.circle(420, 240, 110, 0xffb74d, 0.12).setScrollFactor(0.18);
+    this.add.circle(420, 240, 80, 0xffd180, 0.18).setScrollFactor(0.18);
+
+    // Stalactites hanging from ceiling
+    for (let i = 0; i < 10; i++) {
+      const sx = -200 + i * 130 + Phaser.Math.Between(-25, 25);
+      const sh = Phaser.Math.Between(40, 80);
+      this.add.triangle(sx, 0, -16, 0, 16, 0, 0, sh, 0x3a2a4a).setScrollFactor(0.4);
+      this.add.triangle(sx - 2, 0, -14, 0, 0, sh - 8, -8, 0, 0x4a3a5a).setScrollFactor(0.4);
+    }
+
+    // Magical glow particles floating
+    for (let i = 0; i < 18; i++) {
+      const px = -200 + Phaser.Math.Between(0, 1100);
+      const py = 100 + Phaser.Math.Between(0, 400);
+      const c = Phaser.Math.RND.pick([0xb967ff, 0x42a5f5, 0xa8e6cf, 0xffd180]);
+      const p = this.add.circle(px, py, Phaser.Math.Between(3, 6), c, 0.7).setScrollFactor(0.5);
+      this.tweens.add({
+        targets: p,
+        y: py - Phaser.Math.Between(30, 80),
+        alpha: { from: 0.8, to: 0.1 },
+        duration: 3000 + Math.random() * 2000,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+        delay: i * 150
+      });
+    }
+
+    // Cave ground (foreground)
+    this.add.rectangle(400, 580, 2000, 80, 0x2a1a3a).setScrollFactor(1);
+    this.add.rectangle(400, 555, 2000, 30, 0x3a2a4a, 0.7).setScrollFactor(1);
+
+    // Stalagmites rising from ground
+    for (let i = 0; i < 6; i++) {
+      const sx = -100 + i * 200 + Phaser.Math.Between(-20, 20);
+      this.add.triangle(sx, 540, -14, 30, 14, 30, 0, -Phaser.Math.Between(20, 50), 0x4a3a5a).setScrollFactor(1);
+    }
+
+    // Stones
+    this.add.ellipse(250, 565, 36, 14, 0x4a3a5a).setScrollFactor(1);
+    this.add.ellipse(550, 568, 40, 16, 0x3a2a4a).setScrollFactor(1);
+
+    this.batChar = this.makeBatCharacter(400, 530);
+  }
+
+  makeBatCharacter(x, y) {
+    const c = this.add.container(x, y);
+    c.setScrollFactor(1);
+    const shadow = this.add.ellipse(0, 20, 70, 10, 0x000000, 0.4);
+    this.batBody = this.add.ellipse(0, 0, 24, 32, 0x424242);
+    this.batBodyShade = this.add.ellipse(0, 8, 18, 8, 0x222222);
+    this.batWingL = this.add.triangle(-26, 4, 0, 0, 24, -12, 24, 14, 0x424242);
+    this.batWingR = this.add.triangle(26, 4, 0, 0, -24, -12, -24, 14, 0x424242);
+    this.batHead = this.add.circle(0, -16, 12, 0x424242);
+    this.batEarL = this.add.triangle(-7, -22, -4, 0, 4, 0, 0, -10, 0x424242);
+    this.batEarR = this.add.triangle(7, -22, -4, 0, 4, 0, 0, -10, 0x424242);
+    this.batEyeL = this.add.circle(-4, -16, 2.5, 0xff5722);
+    this.batEyeR = this.add.circle(4, -16, 2.5, 0xff5722);
+    const fangL = this.add.triangle(-2, -10, -1, 0, 1, 0, 0, 4, 0xffffff);
+    const fangR = this.add.triangle(2, -10, -1, 0, 1, 0, 0, 4, 0xffffff);
+    this.hurtOverlay = this.add.ellipse(-26, 4, 30, 18, 0xff9800, 0.45);
+    c.add([shadow, this.batWingL, this.batWingR, this.batBody, this.batBodyShade, this.batHead, this.batEarL, this.batEarR, this.batEyeL, this.batEyeR, fangL, fangR, this.hurtOverlay]);
+    // Hurt wing droops (rotated)
+    this.batWingL.angle = -30;
+    this.tweens.add({ targets: this.hurtOverlay, alpha: { from: 0.4, to: 0.7 }, duration: 800, yoyo: true, repeat: -1 });
+    this.tweens.add({ targets: c, scaleY: { from: 1, to: 0.97 }, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    return c;
+  }
+
+  celebrateBat(onComplete) {
+    const banner = this.makeWinBanner(this.config.winBannerText);
+    playFanfare();
+    this.tweens.add({
+      targets: this.hurtOverlay,
+      alpha: 0,
+      duration: 800
+    });
+    this.tweens.add({
+      targets: this.batWingL,
+      angle: 0,
+      duration: 700,
+      ease: 'Back.easeOut'
+    });
+    this.spawnSparkles(this.batChar.x - 20, this.batChar.y, 20);
+    this.time.delayedCall(900, () => {
+      // Both wings flap rapidly
+      this.tweens.add({
+        targets: this.batWingL,
+        scaleX: { from: 1, to: 0.5 },
+        duration: 120,
+        yoyo: true,
+        repeat: 15
+      });
+      this.tweens.add({
+        targets: this.batWingR,
+        scaleX: { from: 1, to: 0.5 },
+        duration: 120,
+        yoyo: true,
+        repeat: 15
+      });
+      // Bat flies up + loops
+      this.tweens.add({
+        targets: this.batChar,
+        y: this.batChar.y - 200,
+        duration: 1500,
+        ease: 'Sine.easeOut'
+      });
+      this.tweens.add({
+        targets: this.batChar,
+        x: { from: this.batChar.x, to: this.batChar.x + 120 },
+        duration: 800,
+        yoyo: true,
+        ease: 'Sine.easeInOut'
+      });
+    });
+    this.time.delayedCall(2400, () => {
+      // Fly off into cave depths
+      this.tweens.add({
+        targets: this.batChar,
+        x: this.batChar.x + 350,
+        y: 240,
+        scale: 0.3,
+        alpha: 0,
+        duration: 1500,
+        ease: 'Cubic.easeIn'
       });
     });
     this.spawnConfetti(60);
