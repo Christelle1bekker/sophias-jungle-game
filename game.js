@@ -243,7 +243,7 @@ const STOP_CONFIGS = {
     hintText: "It's okay, take your time! 🐀"
   },
   crab: {
-    id: 'crab', built: false, displayName: 'Crab', puzzleKey: 'wordTree',
+    id: 'crab', built: true, displayName: 'Crab', puzzleKey: 'wordTree',
     nextActKey: 'act3', nextStopId: 'snake', partyItemKey: 'flowers',
     puzzleBank: () => SPELLING_QUESTIONS_DEFAULT,
     sceneBuilder: 'buildCrabScene', celebrationBuilder: 'celebrateCrab',
@@ -1219,6 +1219,165 @@ class StopScene extends Phaser.Scene {
       this.updateBanner(banner, this.config.completeBannerText);
     });
     this.scheduleContinue(onComplete, 4500);
+  }
+
+  // ====================================================
+  // Stop 2 — Crab's sore claw
+  // ====================================================
+  buildCrabScene() {
+    this.add.rectangle(400, 60, 2000, 140, 0x4a148c).setScrollFactor(0);
+    this.add.rectangle(400, 150, 2000, 60, 0x7b1fa2).setScrollFactor(0);
+    this.add.rectangle(400, 200, 2000, 40, 0xc2185b).setScrollFactor(0);
+    this.add.rectangle(400, 235, 2000, 30, 0xef5350).setScrollFactor(0);
+    this.add.rectangle(400, 260, 2000, 25, 0xff7043).setScrollFactor(0);
+    this.add.rectangle(400, 285, 2000, 30, 0xff9800).setScrollFactor(0);
+    this.add.rectangle(400, 310, 2000, 25, 0xffb74d).setScrollFactor(0);
+
+    this.add.circle(420, 320, 90, 0xff5722, 0.35).setScrollFactor(0.08);
+    this.add.circle(420, 320, 70, 0xff7043, 0.7).setScrollFactor(0.08);
+    this.add.circle(420, 320, 55, 0xff9800, 1).setScrollFactor(0.08);
+    this.add.circle(415, 315, 24, 0xffffff, 0.6).setScrollFactor(0.08);
+
+    for (let i = 0; i < 5; i++) {
+      const ix = -300 + i * 280 + Phaser.Math.Between(-30, 30);
+      this.add.ellipse(ix, 410, 100, 22, 0x311b4a, 0.9).setScrollFactor(0.18);
+    }
+
+    this.add.rectangle(400, 440, 2000, 50, 0x1a237e).setScrollFactor(0.4);
+    this.add.rectangle(400, 470, 2000, 30, 0x303f9f).setScrollFactor(0.4);
+    this.add.ellipse(420, 425, 320, 18, 0xff7043, 0.7).setScrollFactor(0.4);
+    this.add.ellipse(420, 440, 240, 12, 0xff9800, 0.6).setScrollFactor(0.4);
+    for (let i = 0; i < 10; i++) {
+      const sx = -200 + i * 100 + Phaser.Math.Between(-15, 15);
+      const sy = 430 + Phaser.Math.Between(0, 40);
+      const sh = this.add.ellipse(sx, sy, Phaser.Math.Between(18, 36), 4, 0xffffff, 0.6).setScrollFactor(0.4);
+      this.tweens.add({ targets: sh, alpha: { from: 0.6, to: 0.15 }, duration: 1500, yoyo: true, repeat: -1, delay: i * 130 });
+    }
+
+    for (let i = 0; i < 5; i++) {
+      const dx = -300 + i * 240 + Phaser.Math.Between(-30, 30);
+      this.add.ellipse(dx, 510, 220, 18, 0xddc89a, 0.85).setScrollFactor(0.6);
+    }
+
+    this.add.rectangle(400, 580, 2000, 100, 0xf5deb3).setScrollFactor(1);
+    this.add.rectangle(400, 555, 2000, 30, 0xddc89a, 0.7).setScrollFactor(1);
+
+    for (let i = 0; i < 8; i++) {
+      const sx = Phaser.Math.Between(-100, 900);
+      const sy = 555 + Phaser.Math.Between(0, 50);
+      this.add.ellipse(sx, sy, Phaser.Math.Between(12, 20), Phaser.Math.Between(6, 10), 0xffe0d0).setScrollFactor(1).setRotation(Math.random() * Math.PI);
+    }
+
+    this.crabChar = this.makeCrabCharacter(400, 540);
+  }
+
+  makeCrabCharacter(x, y) {
+    const c = this.add.container(x, y);
+    c.setScrollFactor(1);
+    const shadow = this.add.ellipse(0, 22, 90, 14, 0x000000, 0.35);
+    const body = this.add.ellipse(0, 0, 80, 50, 0xef5350);
+    const bodyShade = this.add.ellipse(0, 12, 70, 18, 0xc62828);
+    const bodyShine = this.add.ellipse(-10, -10, 30, 15, 0xff8a80, 0.7);
+    const eyeStalkL = this.add.rectangle(-10, -22, 3, 14, 0xc62828);
+    const eyeStalkR = this.add.rectangle(10, -22, 3, 14, 0xc62828);
+    const eyeBaseL = this.add.circle(-10, -32, 7, 0xffffff);
+    const eyeBaseR = this.add.circle(10, -32, 7, 0xffffff);
+    const eyeL = this.add.circle(-10, -32, 4, 0x2a2a2a);
+    const eyeR = this.add.circle(10, -32, 4, 0x2a2a2a);
+    const eyeLHi = this.add.circle(-9, -33, 1.5, 0xffffff);
+    const eyeRHi = this.add.circle(11, -33, 1.5, 0xffffff);
+    const clawL = this.add.circle(-50, -8, 16, 0xef5350);
+    const clawLPinch = this.add.triangle(-62, -16, 0, 0, -10, -8, 0, -16, 0xef5350);
+    const clawLPinch2 = this.add.triangle(-62, 0, 0, 0, -10, 8, 0, 16, 0xef5350);
+    this.sorClaw = this.add.container(50, -8);
+    const sorClawBody = this.add.circle(0, 0, 16, 0xef5350);
+    const sorClawTop = this.add.triangle(-12, -8, 0, 0, 12, 0, 12, -8, 0xef5350);
+    const sorClawBot = this.add.triangle(-12, 8, 0, 0, 12, 0, 12, 8, 0xef5350);
+    const soreOverlay = this.add.circle(0, 0, 18, 0xff9800, 0.4);
+    this.sorClawShade = soreOverlay;
+    this.sorClaw.add([sorClawBody, sorClawTop, sorClawBot, soreOverlay]);
+    const legL1 = this.add.rectangle(-30, 16, 3, 12, 0xc62828).setRotation(0.3);
+    const legL2 = this.add.rectangle(-18, 18, 3, 12, 0xc62828).setRotation(0.15);
+    const legL3 = this.add.rectangle(-6, 19, 3, 12, 0xc62828).setRotation(0);
+    const legR1 = this.add.rectangle(6, 19, 3, 12, 0xc62828).setRotation(0);
+    const legR2 = this.add.rectangle(18, 18, 3, 12, 0xc62828).setRotation(-0.15);
+    const legR3 = this.add.rectangle(30, 16, 3, 12, 0xc62828).setRotation(-0.3);
+    c.add([
+      shadow, body, bodyShade, bodyShine,
+      legL1, legL2, legL3, legR1, legR2, legR3,
+      eyeStalkL, eyeStalkR, eyeBaseL, eyeBaseR, eyeL, eyeR, eyeLHi, eyeRHi,
+      clawL, clawLPinch, clawLPinch2, this.sorClaw
+    ]);
+    this.sorClaw.angle = -25;
+    this.tweens.add({ targets: this.sorClawShade, alpha: { from: 0.4, to: 0.7 }, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: c, y: y - 4, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    return c;
+  }
+
+  celebrateCrab(onComplete) {
+    const banner = this.makeWinBanner(this.config.winBannerText);
+    playFanfare();
+    this.tweens.add({
+      targets: this.sorClawShade,
+      alpha: 0,
+      duration: 800
+    });
+    this.tweens.add({
+      targets: this.sorClaw,
+      angle: 0,
+      duration: 700,
+      ease: 'Back.easeOut'
+    });
+    this.spawnSparkles(this.crabChar.x + 50, this.crabChar.y - 8, 18);
+    this.time.delayedCall(900, () => {
+      this.tweens.add({
+        targets: this.crabChar,
+        angle: { from: -8, to: 8 },
+        duration: 180,
+        yoyo: true,
+        repeat: 5
+      });
+      this.tweens.add({
+        targets: this.crabChar,
+        y: this.crabChar.y - 12,
+        duration: 280,
+        yoyo: true,
+        repeat: 3,
+        ease: 'Sine.easeInOut'
+      });
+    });
+    this.time.delayedCall(2200, () => {
+      this.tweens.add({
+        targets: this.crabChar,
+        x: this.crabChar.x - 120,
+        y: this.crabChar.y + 10,
+        duration: 1500,
+        ease: 'Sine.easeInOut'
+      });
+      this.spawnSplash(this.crabChar.x - 200, 510);
+    });
+    this.spawnConfetti(60);
+    this.time.delayedCall(2800, () => {
+      this.updateBanner(banner, this.config.completeBannerText);
+    });
+    this.scheduleContinue(onComplete, 4800);
+  }
+
+  spawnSplash(x, y) {
+    for (let i = 0; i < 10; i++) {
+      const drop = this.add.circle(x, y, Phaser.Math.Between(4, 8), 0xb5d7f0).setScrollFactor(1);
+      const angle = -Math.PI / 2 + Phaser.Math.FloatBetween(-1, 1);
+      const speed = Phaser.Math.Between(60, 120);
+      this.tweens.add({
+        targets: drop,
+        x: x + Math.cos(angle) * speed,
+        y: y + Math.sin(angle) * speed,
+        alpha: { from: 1, to: 0 },
+        duration: 700,
+        ease: 'Cubic.easeOut',
+        onComplete: () => drop.destroy()
+      });
+    }
   }
 }
 
