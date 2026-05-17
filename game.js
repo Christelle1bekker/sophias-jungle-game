@@ -1,30 +1,37 @@
 // ============================================================
 // Sophia and the Rat Jungle
 // ============================================================
-// SAVE SHAPE: locked at version 2. See SaveManager.
-// (v1 → v2 migration: puzzlesSolved restructured to new curriculum.)
+// SAVE SHAPE: locked at version 3. See SaveManager.
+// (v1 → v3 and v2 → v3 migrations: puzzlesSolved restructured to
+//  story-based names matching the animal-stop framing.)
 //
-// PUZZLE CURRICULUM (Session 3+):
-//   1. The Sum Bridge    — maths (Session 3 — built at river crossing)
-//   2. The Word Tree     — spell 3-4 letter words
-//   3. The Counting Cave — count under load (e.g. bats flying past)
-//   4. The Rat Trail     — pattern/sequence (paw print logic)
-//   5. The Party Code    — reading comprehension (sentence + question)
+// GAME SHAPE: Top-down jungle is a MAP. Sophia walks paths between
+// 5 STOPS. Each stop is a parallax scene where she meets an animal
+// in trouble and helps by solving a 3-question quiz (QuizManager).
+// Stop puzzles are CONTENT, not custom mini-games — same engine for
+// every stop. Parent Mode lets a parent set this week's homework
+// (spelling/maths/reading) — the game uses real school content if
+// entered, defaults otherwise.
 //
-// Each puzzle physically opens the path forward; Sophia SEES her
-// cleverness change the world. No babyish tasks.
+// FIVE STOPS (story-based puzzlesSolved keys):
+//   1. 🐀 Snowy's hungry      → MATHS                 (sumBridge)
+//   2. 🦀 Crab's sore claw    → SPELLING              (wordTree)
+//   3. 🐍 Knotted snake       → PATTERNS (default)    (snakeKnots)
+//   4. 🦇 Bat's hurt wing     → COUNTING under load   (batWing)
+//   5. 🦜 Lost parrot         → READING comprehension (parrotStory)
+//
+// Each stop unlocks the next. Finale = the PARTY (all animals gather,
+// Golden Banana descends, Play Again).
 //
 // SOPHIA SPAWN: always (1200, 900). Position not persisted.
 //
-// STORY ARC: Sophia throws a party for Snowy + Midnight. Each act
-// rewards a party item (bananas/flowers/stones/music/Golden Banana).
-// Finale = party scene + Play Again.
-//
 // CAVE: currently Option A (dim-overlay). Graduate to Option B
-// (separate scene) when wiring The Counting Cave puzzle.
+// (separate scene) when wiring Stop 4 (Bat's hurt wing).
 //
 // ARCHIVED: see disabled/flower-puzzle.js for the old colour-match
 // puzzle (binned as too babyish — kept for potential little-kid mode).
+// The Sum Bridge in-world maths puzzle was attempted and rolled back
+// before commit (replaced by the QuizManager architecture).
 // ============================================================
 
 const SOPHIA_SPEED = 200;
@@ -97,15 +104,15 @@ function numberWord(n) {
 
 const SAVE_KEY = 'sophias-rat-jungle-save';
 const DEFAULT_SAVE_STATE = {
-  version: 2,
+  version: 3,
   bananaCount: 0,
   bananasCollected: [],
   puzzlesSolved: {
     sumBridge: false,
     wordTree: false,
-    countingCave: false,
-    ratTrail: false,
-    partyCode: false
+    snakeKnots: false,
+    batWing: false,
+    parrotStory: false
   },
   actsUnlocked: {
     act1: true,
@@ -142,18 +149,22 @@ const SaveManager = {
       }
       const parsed = JSON.parse(raw);
       const fresh = this._cloneDefault();
-      const wasOldVersion = (parsed.version || 1) < 2;
+      const fromVersion = parsed.version || 1;
+      const needsPuzzleReset = fromVersion < 3;
       const merged = Object.assign(fresh, parsed, {
-        version: 2,
-        puzzlesSolved: wasOldVersion
+        version: 3,
+        puzzlesSolved: needsPuzzleReset
           ? fresh.puzzlesSolved
           : Object.assign(fresh.puzzlesSolved, parsed.puzzlesSolved || {}),
         actsUnlocked: Object.assign(fresh.actsUnlocked, parsed.actsUnlocked || {}),
         partyItems: Object.assign(fresh.partyItems, parsed.partyItems || {}),
         stats: Object.assign(fresh.stats, parsed.stats || {})
       });
-      if (wasOldVersion) {
-        console.log('Save migrated v1 → v2');
+      if (fromVersion === 1) {
+        console.log('Save migrated v1 → v3');
+        this.save(merged);
+      } else if (fromVersion === 2) {
+        console.log('Save migrated v2 → v3');
         this.save(merged);
       }
       return merged;
