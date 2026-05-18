@@ -227,6 +227,42 @@ const READING_QUESTIONS_DEFAULT = [
     question: 'Where is the party?',
     answers: ['At the big tree', 'At the beach', 'In the cave', 'By the river'],
     correctIndex: 0
+  },
+  {
+    passage: 'The bat sleeps in the cave. He likes the dark.',
+    question: 'Where does the bat sleep?',
+    answers: ['The cave', 'A tree', 'The beach', 'A nest'],
+    correctIndex: 0
+  },
+  {
+    passage: 'Sophia helped Snowy. Snowy got some cheese.',
+    question: 'What did Snowy get?',
+    answers: ['Cheese', 'Bananas', 'A flower', 'Water'],
+    correctIndex: 0
+  },
+  {
+    passage: 'The snake was sad. He was stuck in a tree. Now he is happy.',
+    question: 'How does the snake feel now?',
+    answers: ['Happy', 'Sad', 'Tired', 'Hungry'],
+    correctIndex: 0
+  },
+  {
+    passage: 'The party has cake. The party has music. Everyone is dancing.',
+    question: 'What is at the party?',
+    answers: ['Cake and music', 'Just cake', 'Just music', 'Snacks'],
+    correctIndex: 0
+  },
+  {
+    passage: 'Midnight is a black rat. Snowy is a white rat. They are friends.',
+    question: 'What colour is Snowy?',
+    answers: ['White', 'Black', 'Brown', 'Grey'],
+    correctIndex: 0
+  },
+  {
+    passage: 'The waterfall is by the river. The river is cold. The fish swim in it.',
+    question: 'Where do the fish swim?',
+    answers: ['In the river', 'In the waterfall', 'On the beach', 'In the cave'],
+    correctIndex: 0
   }
 ];
 
