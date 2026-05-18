@@ -548,6 +548,47 @@ function getAudioCtx() {
   return audioCtx;
 }
 
+// Explicitly unlock audio on first user interaction (Chromium autoplay policy).
+function unlockAudio() {
+  try {
+    const ctx = getAudioCtx();
+    if (ctx && ctx.state === 'suspended') ctx.resume();
+  } catch (e) {}
+}
+window.unlockAudio = unlockAudio;
+
+// ============================================================
+// PERF_TIER — performance tier auto-detection
+// ============================================================
+// "low"  — Pi Zero 2 W / low-spec ARM / tiny viewport: halve particles
+// "mid"  — iPad / mid-spec: stock counts
+// "high" — desktop with hardware accel: stock counts (room to boost)
+//
+// Override via URL param: ?perf=low | ?perf=mid | ?perf=high
+window.PERF_TIER = (function () {
+  try {
+    const url = new URL(window.location.href);
+    const param = (url.searchParams.get('perf') || '').toLowerCase();
+    if (param === 'low' || param === 'mid' || param === 'high') return param;
+  } catch (e) {}
+  const ua = (navigator.userAgent || '').toLowerCase();
+  const cores = navigator.hardwareConcurrency || 4;
+  const w = window.innerWidth || 1024;
+  const h = window.innerHeight || 600;
+  const isArm = /arm|aarch|raspberry/.test(ua) || /linux armv/.test(ua);
+  // Tiny viewport + low core count + ARM signals → low.
+  if (isArm) return 'low';
+  if (w <= 1100 && cores <= 4) return 'low';
+  if (w <= 1366) return 'mid';
+  return 'high';
+})();
+
+function tierScale(low, mid, high) {
+  if (window.PERF_TIER === 'low') return low;
+  if (window.PERF_TIER === 'mid') return mid;
+  return high;
+}
+
 function playSqueak(pitchKind) {
   const ctx = getAudioCtx();
   if (!ctx) return;
@@ -1846,8 +1887,10 @@ class StopScene extends Phaser.Scene {
   spawnConfetti(count) {
     const cam = this.cameras.main;
     const cw = cam.width;
+    // Scale by perf tier: low halves, mid/high keep stock.
+    const scaled = Math.max(8, Math.round(count * tierScale(0.5, 1.0, 1.0)));
     const colors = [0xff5e7e, 0xffeb3b, 0xa8e6cf, 0xb5d7f0, 0xd5b8e8, 0xffd3b6];
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < scaled; i++) {
       const x = Math.random() * cw;
       const y = -10 - Math.random() * 80;
       const piece = this.add.rectangle(x, y, 8, 12, Phaser.Math.RND.pick(colors))
@@ -1866,7 +1909,8 @@ class StopScene extends Phaser.Scene {
   }
 
   spawnSparkles(x, y, count) {
-    for (let i = 0; i < count; i++) {
+    const scaled = Math.max(4, Math.round(count * tierScale(0.5, 1.0, 1.0)));
+    for (let i = 0; i < scaled; i++) {
       const angle = Math.random() * Math.PI * 2;
       const radius = 50 + Math.random() * 100;
       const star = this.add.star(x, y, 4, 3, 8, 0xffeb3b).setDepth(2400);
@@ -2753,8 +2797,9 @@ class StopScene extends Phaser.Scene {
     const fx = Phaser.Math.Between(100, cam.width - 100);
     const fy = Phaser.Math.Between(120, 280);
     const color = Phaser.Math.RND.pick([0xff5e7e, 0xffeb3b, 0xa8e6cf, 0xb5d7f0, 0xd5b8e8, 0xff8e3c]);
-    for (let i = 0; i < 24; i++) {
-      const angle = (i / 24) * Math.PI * 2;
+    const burst = tierScale(14, 24, 24);
+    for (let i = 0; i < burst; i++) {
+      const angle = (i / burst) * Math.PI * 2;
       const star = this.add.star(fx, fy, 4, 3, 8, color).setScrollFactor(0).setDepth(2400);
       const r = 120;
       this.tweens.add({
@@ -4715,6 +4760,10 @@ function openParentModePanel(onClose) {
   header.textContent = '👋 Hi Mum & Dad — set this week\'s words';
   header.style.cssText = 'font-size:20px;font-weight:bold;color:#6b4423;margin-bottom:14px;text-align:center;';
 
+  const piTip = document.createElement('div');
+  piTip.textContent = '💡 Tip: easier to type on a computer or iPad with a keyboard.';
+  piTip.style.cssText = 'font-size:12px;color:#7a5a14;background:#fff3a8;border:1px dashed #c9a13d;border-radius:6px;padding:6px 8px;margin-bottom:12px;text-align:center;';
+
   const label = document.createElement('div');
   label.textContent = 'Paste spelling words separated by commas';
   label.style.cssText = 'font-size:14px;color:#4a2c1a;margin-bottom:6px;';
@@ -4801,7 +4850,7 @@ function openParentModePanel(onClose) {
   closeBtn.addEventListener('click', dismiss);
 
   btnRow.appendChild(saveBtn); btnRow.appendChild(clearBtn); btnRow.appendChild(closeBtn);
-  card.appendChild(header); card.appendChild(label); card.appendChild(textarea);
+  card.appendChild(header); card.appendChild(piTip); card.appendChild(label); card.appendChild(textarea);
   card.appendChild(status); card.appendChild(errorBox); card.appendChild(toggleRow); card.appendChild(btnRow);
   wrap.appendChild(card);
   document.body.appendChild(wrap);
@@ -5151,7 +5200,7 @@ class TitleScene extends Phaser.Scene {
       }).setOrigin(0.5, 0.5);
       bgRect.on('pointerover', () => bgRect.setScale(1.04));
       bgRect.on('pointerout', () => bgRect.setScale(1));
-      bgRect.on('pointerdown', () => { if (!this.settingsOpen) onClick(); });
+      bgRect.on('pointerdown', () => { unlockAudio(); if (!this.settingsOpen) onClick(); });
       return { shadow, bgRect, txt };
     };
 
@@ -5453,9 +5502,9 @@ class EndingScene extends Phaser.Scene {
     this.spawnFinaleBat(cx + 100, groundY - 40);
     this.spawnFinaleParrot(cx + 140, groundY - 12);
 
-    // Confetti continuous
+    // Confetti continuous (slower cadence on low-tier devices)
     this.confettiTimer = this.time.addEvent({
-      delay: 250, loop: true, callback: () => this.dropConfetti()
+      delay: tierScale(500, 250, 250), loop: true, callback: () => this.dropConfetti()
     });
 
     this.bubbleIndex = 0;
@@ -5569,7 +5618,8 @@ class EndingScene extends Phaser.Scene {
   dropConfetti() {
     const cam = this.cameras.main;
     const colors = [0xff5e7e, 0xffeb3b, 0xa8e6cf, 0xb5d7f0, 0xd5b8e8, 0xff8e3c];
-    for (let i = 0; i < 3; i++) {
+    const per = tierScale(1, 3, 3);
+    for (let i = 0; i < per; i++) {
       const x = Math.random() * cam.width;
       const piece = this.add.rectangle(x, -10, 6, 10, Phaser.Math.RND.pick(colors));
       piece.setAngle(Math.random() * 360);
@@ -5682,6 +5732,36 @@ const config = {
 };
 
 window.game = new Phaser.Game(config);
+
+// Resize handler — Phaser FIT scales canvas automatically on parent
+// resize, but we explicitly refresh on window resize for orientation
+// changes (iPad) and detached windows. Debounced.
+(function () {
+  let timer = null;
+  window.addEventListener('resize', () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      try { window.game.scale.refresh(); } catch (e) {}
+    }, 150);
+  });
+  window.addEventListener('orientationchange', () => {
+    setTimeout(() => { try { window.game.scale.refresh(); } catch (e) {} }, 200);
+  });
+})();
+
+// First-pointer audio unlock at document level — belt and braces over
+// the Title-button unlock for Pi Chromium autoplay policy.
+(function () {
+  const handler = () => {
+    try { unlockAudio(); } catch (e) {}
+    window.removeEventListener('pointerdown', handler, true);
+    window.removeEventListener('touchstart', handler, true);
+    window.removeEventListener('keydown', handler, true);
+  };
+  window.addEventListener('pointerdown', handler, true);
+  window.addEventListener('touchstart', handler, true);
+  window.addEventListener('keydown', handler, true);
+})();
 
 window.testStop = function (stopId) {
   const top = window.game.scene.getScene('TopDown');
