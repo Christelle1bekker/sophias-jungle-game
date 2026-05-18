@@ -646,6 +646,7 @@ class QuizManager {
     this.options = options || {};
     this.onComplete = this.options.onComplete || (() => {});
     this.onWrong = this.options.onWrong || (() => {});
+    this.onFail = this.options.onFail || (() => {});
     this.questionsToAsk = Math.min(5, questions.length);
     this.selectedQuestions = [];
     this.currentIndex = 0;
@@ -655,6 +656,10 @@ class QuizManager {
     this.dismissed = false;
     this._answering = false;
     this.keyHandlers = null;
+    this.maxHearts = 3;
+    this.heartsLeft = 3;
+    this.heartTexts = [];
+    this._failing = false;
   }
 
   start() {
@@ -823,6 +828,7 @@ class QuizManager {
 
     this.cardH = cardH;
     this.cardTop = cardTop;
+    this.cardW = cardW;
 
     this.modalElements = [overlay, shadow, card, progress, questionText, closeBg, closeText];
     if (passageText) this.modalElements.push(passageText);
@@ -831,7 +837,24 @@ class QuizManager {
     }
     this.currentButtons = buttons;
 
+    this._buildHeartsUI();
     this._installKeyHandlers();
+  }
+
+  _buildHeartsUI() {
+    const scene = this.scene;
+    const heartY = this.cardTop + 22;
+    const heartXStart = (scene.cameras.main.width / 2) - (this.cardW ? this.cardW / 2 : 290) + 18;
+    this.heartTexts = [];
+    for (let i = 0; i < this.maxHearts; i++) {
+      const isFilled = i < this.heartsLeft;
+      const t = scene.add.text(heartXStart + i * 26, heartY, isFilled ? '❤️' : '🤍', {
+        fontFamily: 'DM Sans, system-ui, sans-serif',
+        fontSize: '20px'
+      }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(2003);
+      this.heartTexts.push(t);
+      this.modalElements.push(t);
+    }
   }
 
   _installKeyHandlers() {
@@ -876,6 +899,14 @@ class QuizManager {
       this._flashButton(btn, 0xef5350);
       playWrong();
       this._wrongStreak++;
+      this._loseHeart();
+      if (this.heartsLeft <= 0) {
+        this._answering = true;
+        this._failing = true;
+        this.scene.time.delayedCall(900, () => this._fail());
+        this.onWrong(index);
+        return;
+      }
       const willShowAnimalHint = (this._wrongStreak >= 2 && this.options.animalHints && this.options.animalHints.hint);
       if (willShowAnimalHint) {
         this._showHintBubble(this.options.animalHints.hint);
@@ -884,6 +915,34 @@ class QuizManager {
       }
       this.onWrong(index);
     }
+  }
+
+  _loseHeart() {
+    if (this.heartsLeft <= 0) return;
+    const lostIdx = this.heartsLeft - 1;
+    this.heartsLeft = lostIdx;
+    const lost = this.heartTexts[lostIdx];
+    if (!lost || !lost.active) return;
+    this.scene.tweens.add({
+      targets: lost,
+      scaleX: { from: 1, to: 1.4 },
+      scaleY: { from: 1, to: 1.4 },
+      duration: 180,
+      yoyo: true,
+      ease: 'Back.easeOut'
+    });
+    this.scene.time.delayedCall(140, () => {
+      if (lost && lost.active) lost.setText('🤍');
+    });
+  }
+
+  _fail() {
+    if (this.dismissed) return;
+    this.isOpen = false;
+    this._destroyModal();
+    this._removeKeyHandlers();
+    if (this.scene.activeQuiz === this) this.scene.activeQuiz = null;
+    this.onFail();
   }
 
   _showReassuranceBubble(btn, index) {
@@ -1611,6 +1670,7 @@ class StopScene extends Phaser.Scene {
     const quiz = new QuizManager(this, questions, {
       onComplete: () => this.startCelebration(),
       onWrong: () => {},
+      onFail: () => this.exitToMapNoSave(),
       animalHints: { hint: this.config.hintText }
     });
     quiz.start();
