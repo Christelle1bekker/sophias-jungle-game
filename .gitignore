@@ -3,3 +3,6 @@ node_modules/
 Thumbs.db
 .DS_Store
 .claude/
+audit/screenshots/
+audit/pi-readiness.md
+audit/visual-review.md
