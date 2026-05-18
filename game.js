@@ -197,6 +197,39 @@ const COUNTING_QUESTIONS_DEFAULT = [
   { question: 'Count the suns: ☀️☀️☀️☀️☀️☀️☀️☀️☀️☀️', answers: [10, 9, 11, 8], correctIndex: 0 }
 ];
 
+const CVC_WORD_BANK_DEFAULT = [
+  // -at
+  'cat','bat','hat','mat','rat','sat','fat','pat',
+  // -ot
+  'dot','got','hot','lot','not','pot','rot','top',
+  // -it
+  'bit','fit','hit','kit','lit','pit','sit',
+  // -et
+  'bet','get','jet','let','met','net','pet','set','vet','wet',
+  // -un
+  'bun','fun','gun','nun','pun','run','sun',
+  // -og
+  'bog','cog','dog','fog','hog','jog','log',
+  // -ad
+  'bad','dad','had','lad','mad','pad','sad','tad',
+  // -ig
+  'big','dig','fig','gig','jig','pig','rig','wig',
+  // -up
+  'cup','pup','sup','up',
+  // -ip
+  'dip','hip','lip','nip','pip','rip','sip','tip','zip',
+  // -ut
+  'but','cut','gut','hut','jut','nut','put','rut',
+  // -an
+  'ban','can','fan','man','pan','ran','tan','van',
+  // -im
+  'dim','him','rim',
+  // -id
+  'bid','did','hid','kid','lid','mid','rid',
+  // Common high-frequency
+  'all','and','said','but','for','his','the','was','you','are'
+];
+
 const READING_QUESTIONS_DEFAULT = [
   {
     passage: 'Snowy is hungry. Midnight is sleepy.',
@@ -298,11 +331,12 @@ const STOP_CONFIGS = {
   },
   crab: {
     id: 'crab', built: true, displayName: 'Crab', puzzleKey: 'wordTree',
+    puzzleType: 'speedRead',
     nextActKey: 'act3', nextStopId: 'snake', partyItemKey: 'flowers',
-    puzzleBank: () => SPELLING_QUESTIONS_DEFAULT,
+    puzzleBank: () => SPELLING_QUESTIONS_DEFAULT, // legacy, unused for speedRead
     sceneBuilder: 'buildCrabScene', celebrationBuilder: 'celebrateCrab',
     dialogue: ["Ouch! My claw is so sore...", "Read the magic words quickly to make it better!"],
-    replayDialogue: ["The magic feels good! Spell some more?"],
+    replayDialogue: ["Want to try again?", "Read fast and beat your best!"],
     completeBannerText: 'Stop 2 complete! 🦀✨',
     winBannerText: '✨ Magic worked!',
     hintText: "You can do it! 🦀"
@@ -368,10 +402,15 @@ const DEFAULT_SAVE_STATE = {
     musicNotes: 0,
     goldenBanana: false
   },
+  speedReadBest: {
+    defaultBank: 0,
+    homeworkBank: 0
+  },
   stats: {
     startedAt: null,
     lastPlayedAt: null,
-    gameCompleted: false
+    gameCompleted: false,
+    crabPracticeDone: false
   }
 };
 
@@ -398,6 +437,7 @@ const SaveManager = {
           : Object.assign(fresh.puzzlesSolved, parsed.puzzlesSolved || {}),
         actsUnlocked: Object.assign(fresh.actsUnlocked, parsed.actsUnlocked || {}),
         partyItems: Object.assign(fresh.partyItems, parsed.partyItems || {}),
+        speedReadBest: Object.assign(fresh.speedReadBest, parsed.speedReadBest || {}),
         stats: Object.assign(fresh.stats, parsed.stats || {})
       });
       if (fromVersion === 1) {
@@ -949,6 +989,473 @@ class QuizManager {
   }
 }
 
+// ============================================================
+// SpeedReadManager — Crab stop's timed word-flash mechanic
+// ============================================================
+// 30 second timer. Word flashes for 1s, then 4 options appear.
+// Correct + fast (<2s) = +3, medium (2-4s) = +2, slow (>4s) = +1.
+// Wrong = -1, advance to next word (no replay — speed practice).
+// Practice round (first play ever): 3 words, 2s flash, no timer.
+class SpeedReadManager {
+  constructor(scene, options) {
+    this.scene = scene;
+    this.options = options || {};
+    this.onPass = this.options.onPass || (() => {});
+    this.onFail = this.options.onFail || (() => {});
+    this.words = this.options.words || [];
+    this.bankKey = this.options.bankKey || 'defaultBank';
+    this.distractorBank = this.options.distractorBank || this.words;
+    this.skipPractice = !!this.options.skipPractice;
+    this.flashMs = 1000;
+    this.practiceFlashMs = 2000;
+    this.timeLimitMs = 30000;
+    this.passThreshold = 4;
+    this.score = 0;
+    this.wordsCompleted = 0;
+    this.optionsShownAt = 0;
+    this.isOpen = false;
+    this.modalElements = [];
+    this.optionButtons = [];
+    this.timerEvent = null;
+    this.endTime = 0;
+    this.flashedWord = null;
+    this.expectedIndex = -1;
+    this.answering = false;
+    this.timerText = null;
+    this.scoreText = null;
+    this.wordText = null;
+    this.bannerText = null;
+    this.keyHandler = null;
+    this.isPractice = false;
+    this.practiceIndex = 0;
+    this.practiceWords = [];
+    this.recentWords = [];
+  }
+
+  start() {
+    this.isOpen = true;
+    this.scene.activeQuiz = this;
+    this._buildModal();
+    if (this.skipPractice) {
+      this._startRealRound();
+    } else {
+      this._startPracticeRound();
+    }
+  }
+
+  _buildModal() {
+    const scene = this.scene;
+    const cam = scene.cameras.main;
+    const cw = cam.width, ch = cam.height;
+    const cx = cw / 2, cy = ch / 2;
+    const cardW = 580, cardH = 480;
+
+    const overlay = scene.add.rectangle(cx, cy, cw, ch, 0x000000, 0.55)
+      .setScrollFactor(0).setDepth(2000).setInteractive();
+    const shadow = scene.add.rectangle(cx + 6, cy + 8, cardW, cardH, 0x000000, 0.3)
+      .setScrollFactor(0).setDepth(2001);
+    const card = scene.add.rectangle(cx, cy, cardW, cardH, 0xfffaf0)
+      .setStrokeStyle(4, 0x4a2c1a)
+      .setScrollFactor(0).setDepth(2001);
+
+    const cardTop = cy - cardH / 2;
+    this.timerText = scene.add.text(cx - cardW / 2 + 20, cardTop + 18, '⏱ 30', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '20px', color: '#c62828', fontStyle: 'bold'
+    }).setOrigin(0, 0).setScrollFactor(0).setDepth(2003);
+    this.scoreText = scene.add.text(cx + cardW / 2 - 20, cardTop + 18, '★ 0', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '20px', color: '#6b4423', fontStyle: 'bold'
+    }).setOrigin(1, 0).setScrollFactor(0).setDepth(2003);
+
+    this.bannerText = scene.add.text(cx, cardTop + 56, '', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '16px', color: '#6b4423', fontStyle: 'italic', align: 'center',
+      wordWrap: { width: cardW - 40 }
+    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(2003);
+
+    this.wordText = scene.add.text(cx, cy - 50, '', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '72px', color: '#2a2a2a', fontStyle: 'bold', align: 'center'
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2003);
+
+    const closeR = 18;
+    const closeBg = scene.add.circle(cx + cardW / 2 - closeR - 8, cardTop + closeR + 8, closeR, 0xff6b6b)
+      .setStrokeStyle(3, 0x4a2c1a)
+      .setScrollFactor(0).setDepth(2004)
+      .setInteractive({ useHandCursor: true });
+    const closeText = scene.add.text(closeBg.x, closeBg.y, '✕', {
+      fontFamily: 'DM Sans, system-ui, sans-serif',
+      fontSize: '22px', color: '#ffffff', fontStyle: 'bold'
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2005);
+    closeBg.on('pointerdown', () => this.dismiss());
+
+    this.cardW = cardW;
+    this.cardH = cardH;
+    this.cardCx = cx;
+    this.cardCy = cy;
+    this.cardTop = cardTop;
+    this.modalElements = [overlay, shadow, card, this.timerText, this.scoreText, this.bannerText, this.wordText, closeBg, closeText];
+
+    this.keyHandler = (e) => {
+      if (!this.isOpen || this.answering) return;
+      const key = e.key.toLowerCase();
+      const map = { a: 0, b: 1, c: 2, d: 3 };
+      if (key in map && this.optionButtons.length > 0) {
+        e.preventDefault();
+        const idx = map[key];
+        if (this.optionButtons[idx]) this._answer(idx);
+      } else if (key === 'escape') {
+        e.preventDefault();
+        this.dismiss();
+      }
+    };
+    window.addEventListener('keydown', this.keyHandler);
+  }
+
+  _startPracticeRound() {
+    this.isPractice = true;
+    this.practiceIndex = 0;
+    this.practiceWords = this._pickWords(3);
+    this.bannerText.setText('Practice round! Read the word, then tap what you saw.');
+    this.timerText.setVisible(false);
+    this._flashNextPracticeWord();
+  }
+
+  _flashNextPracticeWord() {
+    this._clearOptions();
+    if (this.practiceIndex >= this.practiceWords.length) {
+      this._endPractice();
+      return;
+    }
+    const w = this.practiceWords[this.practiceIndex];
+    this._flashWord(w, this.practiceFlashMs, () => {
+      this._showOptions(w, true);
+    });
+  }
+
+  _endPractice() {
+    this._clearOptions();
+    this.wordText.setText('');
+    this.bannerText.setText('Ready for real? Tap to start!');
+    const save = SaveManager.load();
+    save.stats.crabPracticeDone = true;
+    SaveManager.save(save);
+
+    const scene = this.scene;
+    const cx = this.cardCx, cy = this.cardCy + 40;
+    const btnBg = scene.add.rectangle(cx, cy, 260, 70, 0xa8e6cf)
+      .setStrokeStyle(3, 0x4a2c1a)
+      .setScrollFactor(0).setDepth(2003)
+      .setInteractive({ useHandCursor: true });
+    const btnTxt = scene.add.text(cx, cy, 'START! 🦀', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '24px', color: '#1f5e44', fontStyle: 'bold'
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2004);
+    this.modalElements.push(btnBg, btnTxt);
+    btnBg.on('pointerdown', () => {
+      btnBg.destroy(); btnTxt.destroy();
+      this._startRealRound();
+    });
+  }
+
+  _startRealRound() {
+    this.isPractice = false;
+    this.score = 0;
+    this.wordsCompleted = 0;
+    this.recentWords = [];
+    this.scoreText.setText('★ 0');
+    this.timerText.setVisible(true);
+    this.bannerText.setText('Read the word and tap what you saw — be quick!');
+    this.endTime = this.scene.time.now + this.timeLimitMs;
+    this._tickTimer();
+    this._flashNextRealWord();
+  }
+
+  _tickTimer() {
+    if (!this.isOpen || this.isPractice) return;
+    const remaining = Math.max(0, this.endTime - this.scene.time.now);
+    const secs = Math.ceil(remaining / 1000);
+    this.timerText.setText('⏱ ' + secs);
+    if (remaining <= 0) {
+      this._endRound();
+      return;
+    }
+    this.scene.time.delayedCall(100, () => this._tickTimer());
+  }
+
+  _flashNextRealWord() {
+    if (!this.isOpen || this.isPractice) return;
+    const remaining = this.endTime - this.scene.time.now;
+    if (remaining <= 0) return;
+    this._clearOptions();
+    const w = this._pickWords(1, this.recentWords)[0];
+    this.recentWords.push(w);
+    if (this.recentWords.length > 6) this.recentWords.shift();
+    this._flashWord(w, this.flashMs, () => {
+      if (!this.isOpen || this.isPractice) return;
+      this._showOptions(w, false);
+    });
+  }
+
+  _flashWord(word, durationMs, onDone) {
+    this.flashedWord = word;
+    this.wordText.setText(word.toUpperCase());
+    this.wordText.setAlpha(0);
+    this.scene.tweens.add({
+      targets: this.wordText,
+      alpha: { from: 0, to: 1 },
+      duration: 100,
+      yoyo: false
+    });
+    this.scene.time.delayedCall(durationMs, () => {
+      if (!this.isOpen) return;
+      this.scene.tweens.add({
+        targets: this.wordText,
+        alpha: 0,
+        duration: 120,
+        onComplete: () => {
+          this.wordText.setText('');
+          this.wordText.setAlpha(1);
+          if (onDone) onDone();
+        }
+      });
+    });
+  }
+
+  _showOptions(target, isPractice) {
+    const scene = this.scene;
+    const options = this._buildOptions(target);
+    this.expectedIndex = options.indexOf(target);
+    this.optionsShownAt = scene.time.now;
+    const cx = this.cardCx, cy = this.cardCy + 90;
+    const btnW = 220, btnH = 56, gapX = 20, gapY = 14;
+    const btnColors = [0xa8e6cf, 0xffd3b6, 0xb5d7f0, 0xd5b8e8];
+    const btnTextColors = ['#1f5e44', '#7a3a14', '#1a4a6e', '#4e2a6e'];
+    const letters = ['A', 'B', 'C', 'D'];
+    this.optionButtons = [];
+    for (let i = 0; i < 4; i++) {
+      const col = i % 2, row = Math.floor(i / 2);
+      const bx = cx + (col === 0 ? -(btnW / 2 + gapX / 2) : (btnW / 2 + gapX / 2));
+      const by = cy + (row === 0 ? -(btnH / 2 + gapY / 2) : (btnH / 2 + gapY / 2));
+      const bg = scene.add.rectangle(bx, by, btnW, btnH, btnColors[i])
+        .setStrokeStyle(3, 0x4a2c1a)
+        .setScrollFactor(0).setDepth(2003)
+        .setInteractive({ useHandCursor: true });
+      const letter = scene.add.text(bx - btnW / 2 + 14, by, letters[i], {
+        fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+        fontSize: '18px', color: btnTextColors[i], fontStyle: 'bold'
+      }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(2004);
+      const txt = scene.add.text(bx + 8, by, options[i], {
+        fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+        fontSize: '24px', color: btnTextColors[i], fontStyle: 'bold'
+      }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2004);
+      const idx = i;
+      bg.on('pointerdown', () => this._answer(idx));
+      this.optionButtons.push({ bg, letter, txt });
+    }
+  }
+
+  _clearOptions() {
+    for (const b of this.optionButtons) {
+      if (b.bg) b.bg.destroy();
+      if (b.letter) b.letter.destroy();
+      if (b.txt) b.txt.destroy();
+    }
+    this.optionButtons = [];
+  }
+
+  _answer(idx) {
+    if (this.answering || !this.isOpen) return;
+    const correct = idx === this.expectedIndex;
+    this.answering = true;
+    const btn = this.optionButtons[idx];
+    const flashColor = correct ? 0x4caf50 : 0xef5350;
+    if (btn && btn.bg && btn.bg.active) {
+      const orig = btn.bg.fillColor;
+      btn.bg.setFillStyle(flashColor);
+      this.scene.tweens.add({
+        targets: btn.bg,
+        scaleX: { from: 1.08, to: 1 },
+        scaleY: { from: 1.08, to: 1 },
+        duration: 220,
+        ease: 'Back.easeOut',
+        onComplete: () => { if (btn.bg.active) btn.bg.setFillStyle(orig); }
+      });
+    }
+    if (this.isPractice) {
+      if (correct) playCorrect(); else playWrong();
+      this.scene.time.delayedCall(450, () => {
+        this.answering = false;
+        this.practiceIndex++;
+        this._flashNextPracticeWord();
+      });
+      return;
+    }
+    // Real round scoring
+    const elapsed = this.scene.time.now - this.optionsShownAt;
+    let delta = 0;
+    if (correct) {
+      if (elapsed < 2000) delta = 3;
+      else if (elapsed < 4000) delta = 2;
+      else delta = 1;
+      playCorrect();
+    } else {
+      delta = -1;
+      playWrong();
+    }
+    this.score = Math.max(0, this.score + delta);
+    this.wordsCompleted++;
+    this.scoreText.setText('★ ' + this.score);
+    const remaining = this.endTime - this.scene.time.now;
+    this.scene.time.delayedCall(remaining <= 0 ? 200 : 350, () => {
+      this.answering = false;
+      if (remaining <= 0) {
+        this._endRound();
+      } else {
+        this._flashNextRealWord();
+      }
+    });
+  }
+
+  _endRound() {
+    if (this._revealShown) return;
+    this._revealShown = true;
+    this._clearOptions();
+    this.wordText.setText('');
+    this.timerText.setText('⏱ 0');
+
+    const save = SaveManager.load();
+    if (!save.speedReadBest) save.speedReadBest = { defaultBank: 0, homeworkBank: 0 };
+    const prevBest = save.speedReadBest[this.bankKey] || 0;
+    let newBest = prevBest;
+    if (this.score > prevBest) {
+      newBest = this.score;
+      save.speedReadBest[this.bankKey] = this.score;
+      SaveManager.save(save);
+    }
+    const beatBest = this.score > prevBest;
+    const passed = this.score >= this.passThreshold;
+
+    let rating;
+    if (this.score >= 12) rating = 'WOW! ⭐⭐⭐';
+    else if (this.score >= 8) rating = 'Amazing! ⭐⭐';
+    else if (this.score >= 4) rating = 'Great reading! ⭐';
+    else rating = 'Good start! Try again to beat it!';
+
+    const scene = this.scene;
+    const cx = this.cardCx, cy = this.cardCy;
+    const reveal = scene.add.text(cx, cy - 60, 'You read ' + this.score + ' words! 🌟', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '30px', color: '#2a2a2a', fontStyle: 'bold', align: 'center'
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2004);
+    const ratingTxt = scene.add.text(cx, cy - 10, rating, {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '24px', color: '#6b4423', fontStyle: 'bold', align: 'center'
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2004);
+    const bestLine = beatBest
+      ? 'New best! Previous: ' + prevBest
+      : 'Your best: ' + newBest + ' words!';
+    const bestTxt = scene.add.text(cx, cy + 26, bestLine, {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '18px', color: '#4a2c1a', fontStyle: 'italic', align: 'center'
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2004);
+    this.modalElements.push(reveal, ratingTxt, bestTxt);
+
+    if (!passed) {
+      const failTxt = scene.add.text(cx, cy + 60, 'Almost! Try again — read fast!', {
+        fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+        fontSize: '16px', color: '#c62828', fontStyle: 'bold', align: 'center'
+      }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2004);
+      this.modalElements.push(failTxt);
+    }
+
+    const btnY = cy + 110;
+    const btnBg = scene.add.rectangle(cx, btnY, 240, 60, passed ? 0xa8e6cf : 0xffd3b6)
+      .setStrokeStyle(3, 0x4a2c1a)
+      .setScrollFactor(0).setDepth(2004)
+      .setInteractive({ useHandCursor: true });
+    const btnTxt = scene.add.text(cx, btnY, passed ? 'CONTINUE 🌟' : 'BACK TO MAP', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '20px', color: passed ? '#1f5e44' : '#7a3a14', fontStyle: 'bold'
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2005);
+    this.modalElements.push(btnBg, btnTxt);
+    btnBg.on('pointerdown', () => {
+      this._destroyModal();
+      this._removeKeyHandler();
+      this.isOpen = false;
+      if (this.scene.activeQuiz === this) this.scene.activeQuiz = null;
+      if (passed) this.onPass(this.score);
+      else this.onFail(this.score);
+    });
+  }
+
+  _pickWords(n, excludeList) {
+    const pool = this.words.filter(w => !excludeList || !excludeList.includes(w));
+    const source = pool.length >= n ? pool : this.words.slice();
+    const shuffled = source.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled.slice(0, n);
+  }
+
+  _buildOptions(target) {
+    const sameLen = this.distractorBank.filter(w => w !== target && w.length === target.length);
+    const scored = sameLen.map(w => {
+      let m = 0;
+      for (let i = 0; i < w.length; i++) if (w[i] === target[i]) m++;
+      return { w, m };
+    });
+    scored.sort((a, b) => b.m - a.m + (Math.random() - 0.5));
+    const distractors = [];
+    for (const s of scored) {
+      if (distractors.length >= 3) break;
+      if (!distractors.includes(s.w)) distractors.push(s.w);
+    }
+    // Fallback: pull any words from distractor bank if not enough same-length
+    if (distractors.length < 3) {
+      const others = this.distractorBank.filter(w => w !== target && !distractors.includes(w));
+      while (distractors.length < 3 && others.length > 0) {
+        const j = Math.floor(Math.random() * others.length);
+        distractors.push(others.splice(j, 1)[0]);
+      }
+    }
+    const opts = [target, ...distractors.slice(0, 3)];
+    while (opts.length < 4) opts.push(target); // last-ditch — only if bank is tiny
+    // Shuffle
+    for (let i = opts.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [opts[i], opts[j]] = [opts[j], opts[i]];
+    }
+    return opts;
+  }
+
+  _destroyModal() {
+    for (const e of this.modalElements) {
+      if (e && e.destroy) e.destroy();
+    }
+    this.modalElements = [];
+    this._clearOptions();
+  }
+
+  _removeKeyHandler() {
+    if (this.keyHandler) {
+      window.removeEventListener('keydown', this.keyHandler);
+      this.keyHandler = null;
+    }
+  }
+
+  dismiss() {
+    if (!this.isOpen) return;
+    this.isOpen = false;
+    this._destroyModal();
+    this._removeKeyHandler();
+    if (this.scene.activeQuiz === this) this.scene.activeQuiz = null;
+  }
+}
+
 class DialogueSequence {
   constructor(scene, lines, onComplete) {
     this.scene = scene;
@@ -1074,9 +1581,29 @@ class StopScene extends Phaser.Scene {
   startDialogue() {
     const save = SaveManager.load();
     this.isReplay = save.puzzlesSolved[this.config.puzzleKey] === true;
-    const lines = this.isReplay ? this.config.replayDialogue : this.config.dialogue;
-    this.dialogue = new DialogueSequence(this, lines, () => this.startQuiz());
+    let lines;
+    if (this.config.id === 'crab') {
+      const useHomework = HomeworkManager.hasActivePack();
+      const bankKey = useHomework ? 'homeworkBank' : 'defaultBank';
+      const best = (save.speedReadBest && save.speedReadBest[bankKey]) || 0;
+      if (best > 0) {
+        lines = ['Want to try again? Your best is ' + best + ' words!', 'Read fast and beat it!'];
+      } else {
+        lines = this.isReplay ? this.config.replayDialogue : this.config.dialogue;
+      }
+    } else {
+      lines = this.isReplay ? this.config.replayDialogue : this.config.dialogue;
+    }
+    this.dialogue = new DialogueSequence(this, lines, () => this.startPuzzle());
     this.dialogue.start();
+  }
+
+  startPuzzle() {
+    if (this.config.puzzleType === 'speedRead') {
+      this.startSpeedRead();
+    } else {
+      this.startQuiz();
+    }
   }
 
   startQuiz() {
@@ -1087,6 +1614,47 @@ class StopScene extends Phaser.Scene {
       animalHints: { hint: this.config.hintText }
     });
     quiz.start();
+  }
+
+  startSpeedRead() {
+    const save = SaveManager.load();
+    const useHomework = HomeworkManager.hasActivePack();
+    const bankKey = useHomework ? 'homeworkBank' : 'defaultBank';
+    const words = useHomework ? HomeworkManager.getActiveWords() : CVC_WORD_BANK_DEFAULT.slice();
+    const distractorBank = words; // homework: pull all from pack; default: full bank
+    const skipPractice = !!(save.stats && save.stats.crabPracticeDone);
+    const speed = new SpeedReadManager(this, {
+      words,
+      distractorBank,
+      bankKey,
+      skipPractice,
+      onPass: () => this.startCelebration(),
+      onFail: () => this.exitToMapNoSave()
+    });
+    speed.start();
+  }
+
+  exitToMapNoSave() {
+    if (this.exiting) return;
+    this.exiting = true;
+    const cam = this.cameras.main;
+    const cx = cam.width / 2, cy = cam.height / 2;
+    const msg = this.add.text(cx, cy, 'Try again! ' + this.config.displayName + ' is waiting.', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '24px', color: '#4a2c1a', fontStyle: 'bold', align: 'center',
+      stroke: '#fffaf0', strokeThickness: 6
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(3000);
+    msg.alpha = 0;
+    this.tweens.add({ targets: msg, alpha: 1, duration: 250 });
+    this.time.delayedCall(2000, () => {
+      this.cameras.main.fadeOut(500, 255, 255, 255);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.start('TopDown', {
+          returnTo: this.returnTo,
+          justCompleted: null
+        });
+      });
+    });
   }
 
   startCelebration() {
