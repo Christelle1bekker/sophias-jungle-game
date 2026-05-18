@@ -757,11 +757,54 @@ class QuizManager {
       this._flashButton(btn, 0xef5350);
       playWrong();
       this._wrongStreak++;
-      if (this._wrongStreak >= 2 && this.options.animalHints && this.options.animalHints.hint) {
+      const willShowAnimalHint = (this._wrongStreak >= 2 && this.options.animalHints && this.options.animalHints.hint);
+      if (willShowAnimalHint) {
         this._showHintBubble(this.options.animalHints.hint);
+      } else {
+        this._showReassuranceBubble(btn, index);
       }
       this.onWrong(index);
     }
+  }
+
+  _showReassuranceBubble(btn, index) {
+    if (this._hintActive) return;
+    const scene = this.scene;
+    const row = (index < 2) ? 0 : 1;
+    const offset = row === 0 ? -56 : 56;
+    const bubbleX = btn.x;
+    const bubbleY = btn.y + offset;
+    const t = scene.add.text(bubbleX, bubbleY, 'Not quite! Try again.', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '14px',
+      color: '#2a2a2a',
+      fontStyle: 'bold',
+      align: 'center'
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2008);
+    const padX = 14, padY = 8;
+    const bg = scene.add.rectangle(bubbleX, bubbleY, t.width + padX * 2, t.height + padY * 2, 0xfffaf0, 0.96)
+      .setStrokeStyle(2, 0x8b6f3a)
+      .setScrollFactor(0).setDepth(2007);
+    bg.alpha = 0; t.alpha = 0;
+    bg.setScale(0.8); t.setScale(0.8);
+    scene.tweens.add({
+      targets: [bg, t],
+      alpha: 1,
+      scale: 1,
+      duration: 180,
+      ease: 'Back.easeOut'
+    });
+    scene.time.delayedCall(1500, () => {
+      scene.tweens.add({
+        targets: [bg, t],
+        alpha: 0,
+        duration: 250,
+        onComplete: () => {
+          if (bg.active) bg.destroy();
+          if (t.active) t.destroy();
+        }
+      });
+    });
   }
 
   _showHintBubble(text) {
