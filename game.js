@@ -150,18 +150,36 @@ const SPELLING_QUESTIONS_DEFAULT = [
 ];
 
 const PATTERN_QUESTIONS_DEFAULT = [
-  { question: '🟢 🔵 🟢 🔵 🟢 ?',       answers: ['🔵', '🟢', '🔴', '⚫'],     correctIndex: 0 },
-  { question: '🌟 🌟 🌙 🌟 🌟 🌙 ?',     answers: ['🌟', '🌙', '☀️', '⭐'],     correctIndex: 0 },
-  { question: '🔺 🔵 🔺 🔵 🔺 ?',       answers: ['🔵', '🔺', '🟦', '🟨'],    correctIndex: 0 },
-  { question: 'A B A B A ?',         answers: ['B', 'A', 'C', 'D'],         correctIndex: 0 },
-  { question: '1 2 1 2 1 ?',         answers: ['2', '1', '3', '0'],         correctIndex: 0 },
-  { question: '🍎 🍌 🍎 🍌 🍎 ?',       answers: ['🍌', '🍎', '🍇', '🍊'],    correctIndex: 0 },
-  { question: '🐱 🐶 🐱 🐶 🐱 ?',       answers: ['🐶', '🐱', '🐰', '🐻'],    correctIndex: 0 },
-  { question: '▲ ● ▲ ● ▲ ?',         answers: ['●', '▲', '■', '★'],         correctIndex: 0 },
-  { question: 'Red Blue Red Blue Red ?', answers: ['Blue', 'Red', 'Green', 'Yellow'], correctIndex: 0 },
-  { question: '🟢 🟢 🔵 🟢 🟢 🔵 ?',     answers: ['🟢', '🔵', '🔴', '🟡'],     correctIndex: 0 },
-  { question: 'Big Small Big Small Big ?', answers: ['Small', 'Big', 'Tiny', 'Huge'], correctIndex: 0 },
-  { question: '1 1 2 1 1 2 ?',       answers: ['1', '2', '3', '0'],         correctIndex: 0 }
+  // AABB / AAB patterns
+  { question: '🌟 🌟 🌙 🌟 🌟 🌙 ?',  answers: ['🌟', '🌙', '☀️', '⭐'],      correctIndex: 0 },
+  { question: '🍎 🍌 🍌 🍎 🍌 🍌 ?',  answers: ['🍎', '🍌', '🍇', '🍊'],     correctIndex: 0 },
+  { question: '🐱 🐱 🐶 🐱 🐱 🐶 ?',  answers: ['🐱', '🐶', '🐰', '🐻'],     correctIndex: 0 },
+
+  // ABCABC patterns
+  { question: '🔴 🔵 🟡 🔴 🔵 🟡 ?',  answers: ['🔴', '🔵', '🟡', '🟢'],     correctIndex: 0 },
+  { question: 'A B C A B C ?',     answers: ['A', 'B', 'C', 'D'],         correctIndex: 0 },
+  { question: '🐰 🐢 🐦 🐰 🐢 🐦 ?',  answers: ['🐰', '🐢', '🐦', '🐱'],     correctIndex: 0 },
+
+  // Add 2 sequences
+  { question: '2, 4, 6, 8, ?',     answers: [10, 9, 11, 12],              correctIndex: 0 },
+  { question: '1, 3, 5, 7, ?',     answers: [9, 8, 11, 10],               correctIndex: 0 },
+  { question: '10, 12, 14, ?',     answers: [16, 15, 17, 18],             correctIndex: 0 },
+
+  // Subtract 2 sequences
+  { question: '20, 18, 16, ?',     answers: [14, 13, 15, 12],             correctIndex: 0 },
+  { question: '15, 13, 11, ?',     answers: [9, 10, 8, 7],                correctIndex: 0 },
+
+  // Skip counting (5s)
+  { question: '5, 10, 15, 20, ?',  answers: [25, 20, 30, 35],             correctIndex: 0 },
+  { question: '10, 15, 20, 25, ?', answers: [30, 35, 28, 32],             correctIndex: 0 },
+
+  // Reasoning patterns
+  { question: '🐰 hops 2, then 4, then 6, then?', answers: [8, 7, 10, 12], correctIndex: 0 },
+  { question: '🐌 1 step, 🐌🐌 2 steps, 🐌🐌🐌 3 steps. Next?',
+                                   answers: ['🐌🐌🐌🐌 4 steps', '5', '3', '2'], correctIndex: 0 },
+
+  // Letter sequence
+  { question: 'A B C D ?',         answers: ['E', 'F', 'D', 'G'],         correctIndex: 0 }
 ];
 
 const COUNTING_QUESTIONS_DEFAULT = [
