@@ -410,7 +410,9 @@ const DEFAULT_SAVE_STATE = {
     startedAt: null,
     lastPlayedAt: null,
     gameCompleted: false,
-    crabPracticeDone: false
+    crabPracticeDone: false,
+    openingSeen: false,
+    endingSeen: false
   }
 };
 
@@ -1722,11 +1724,36 @@ class StopScene extends Phaser.Scene {
       this.applySaveProgress();
       this.completedThisVisit = true;
     }
+    const onCelDone = (this.config.id === 'parrot')
+      ? () => this.parrotCelebrationDone()
+      : () => this.exitToMap(false);
     if (typeof this[this.config.celebrationBuilder] === 'function') {
-      this[this.config.celebrationBuilder](() => this.exitToMap(false));
+      this[this.config.celebrationBuilder](onCelDone);
+    } else {
+      onCelDone();
+    }
+  }
+
+  parrotCelebrationDone() {
+    const save = SaveManager.load();
+    if (!save.stats.endingSeen) {
+      save.stats.endingSeen = true;
+      SaveManager.save(save);
+      this.exitToEnding();
     } else {
       this.exitToMap(false);
     }
+  }
+
+  exitToEnding() {
+    if (this.exiting) return;
+    this.exiting = true;
+    if (this.dialogue) this.dialogue._cleanup();
+    if (this.activeQuiz && this.activeQuiz.isOpen) this.activeQuiz.dismiss();
+    this.cameras.main.fadeOut(700, 255, 255, 255);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.start('Ending', {});
+    });
   }
 
   applySaveProgress() {
@@ -2872,8 +2899,8 @@ class TopDownScene extends Phaser.Scene {
     this.pathHighlightUntil = 0;
     this.buildStopMarkers();
 
-    this.buildParentModeHoldZone();
     this.buildHomeworkIndicator();
+    this.buildMapTopButtons();
 
     this.caveDim = this.add.rectangle(400, 300, 800, 600, 0x080820)
       .setAlpha(0)
@@ -4270,50 +4297,45 @@ class TopDownScene extends Phaser.Scene {
   }
 
   // ====================================================
-  // Parent Mode — hold top-right corner for 3 seconds
+  // Top-of-map UI buttons: Title (top-left) + My Adventure (top-right)
   // ====================================================
-  buildParentModeHoldZone() {
+  buildMapTopButtons() {
     const cam = this.cameras.main;
-    const cw = cam.width, ch = cam.height;
-    const zoneSize = 90;
-    const zone = this.add.rectangle(cw - zoneSize / 2, zoneSize / 2, zoneSize, zoneSize, 0xffffff, 0)
-      .setScrollFactor(0).setDepth(1500).setInteractive();
-    this.parentHoldZone = zone;
-    this.parentHoldTimer = null;
-    this.parentHoldPip = null;
+    const cw = cam.width;
+    // Title button (top-left, beside banana counter — counter at x=14..264)
+    const tx = cw - 100;
+    const ty = 32;
+    const titleBg = this.add.rectangle(tx, ty, 120, 36, 0x000000, 0.55)
+      .setStrokeStyle(2, 0xffeb3b, 0.8)
+      .setScrollFactor(0).setDepth(1000)
+      .setInteractive({ useHandCursor: true });
+    const titleTxt = this.add.text(tx, ty, '📖 My Adventure', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '13px', color: '#ffffff', stroke: '#000000', strokeThickness: 2,
+      fontStyle: 'bold'
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(1001);
+    titleBg.on('pointerdown', () => openMyAdventurePanel(() => {}));
 
-    const cancel = () => {
-      if (this.parentHoldTimer) {
-        this.parentHoldTimer.remove(false);
-        this.parentHoldTimer = null;
-      }
-      if (this.parentHoldPip) {
-        this.parentHoldPip.destroy();
-        this.parentHoldPip = null;
-      }
-    };
+    // ← Title button bottom-left
+    const bx = 60;
+    const by = cam.height - 28;
+    const backBg = this.add.rectangle(bx, by, 100, 32, 0x000000, 0.55)
+      .setStrokeStyle(2, 0xffeb3b, 0.8)
+      .setScrollFactor(0).setDepth(1000)
+      .setInteractive({ useHandCursor: true });
+    const backTxt = this.add.text(bx, by, '← Title', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '13px', color: '#ffffff', stroke: '#000000', strokeThickness: 2,
+      fontStyle: 'bold'
+    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(1001);
+    backBg.on('pointerdown', () => this.returnToTitle());
+  }
 
-    zone.on('pointerdown', () => {
-      if (this.parentModeOpen || this.placeholderOpen || (this.activeQuiz && this.activeQuiz.isOpen)) return;
-      cancel();
-      const pipX = cw - 14, pipY = 14;
-      this.parentHoldPip = this.add.text(pipX, pipY, '…', {
-        fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
-        fontSize: '22px',
-        color: '#ffeb3b',
-        stroke: '#000000',
-        strokeThickness: 3,
-        fontStyle: 'bold'
-      }).setOrigin(1, 0).setScrollFactor(0).setDepth(1501);
-      this.tweens.add({ targets: this.parentHoldPip, alpha: { from: 0.4, to: 1 }, duration: 600, yoyo: true, repeat: -1 });
-      this.parentHoldTimer = this.time.delayedCall(3000, () => {
-        cancel();
-        this.openParentMode();
-      });
-    });
-    zone.on('pointerup', cancel);
-    zone.on('pointerout', cancel);
-    zone.on('pointerupoutside', cancel);
+  returnToTitle() {
+    if (this.exiting) return;
+    this.exiting = true;
+    this.cameras.main.fadeOut(400, 255, 255, 255);
+    this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('Title', {}));
   }
 
   buildHomeworkIndicator() {
@@ -4386,137 +4408,10 @@ class TopDownScene extends Phaser.Scene {
   openParentMode() {
     if (this.parentModeOpen) return;
     this.parentModeOpen = true;
-
-    const existing = HomeworkManager.load();
-    const existingWords = (existing && existing.spelling && existing.spelling.words) ? existing.spelling.words.slice() : [];
-    let useHomework = !!(existing && existing.active);
-
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:"DM Sans","Comic Sans MS",system-ui,sans-serif;';
-
-    const card = document.createElement('div');
-    card.style.cssText = 'background:#fffaf0;border:4px solid #4a2c1a;border-radius:14px;padding:24px;max-width:520px;width:90%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.4);';
-
-    const header = document.createElement('div');
-    header.textContent = '👋 Hi Mum & Dad — set this week\'s words';
-    header.style.cssText = 'font-size:20px;font-weight:bold;color:#6b4423;margin-bottom:14px;text-align:center;';
-
-    const label = document.createElement('div');
-    label.textContent = 'Paste spelling words separated by commas';
-    label.style.cssText = 'font-size:14px;color:#4a2c1a;margin-bottom:6px;';
-
-    const textarea = document.createElement('textarea');
-    textarea.placeholder = 'e.g. vet, van, hip, pot, had, fun, bad, zip...';
-    textarea.value = existingWords.join(', ');
-    textarea.style.cssText = 'width:100%;box-sizing:border-box;height:120px;padding:10px;border:2px solid #8b6f3a;border-radius:8px;font-family:inherit;font-size:16px;resize:vertical;color:#2a2a2a;background:#fffdf5;';
-
-    const status = document.createElement('div');
-    status.style.cssText = 'margin-top:8px;font-size:14px;min-height:20px;color:#4a2c1a;';
-
-    const errorBox = document.createElement('div');
-    errorBox.style.cssText = 'margin-top:4px;font-size:13px;color:#c62828;white-space:pre-wrap;';
-
-    const toggleRow = document.createElement('label');
-    toggleRow.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:14px;cursor:pointer;font-size:15px;color:#4a2c1a;';
-    const toggleCheckbox = document.createElement('input');
-    toggleCheckbox.type = 'checkbox';
-    toggleCheckbox.checked = useHomework;
-    toggleCheckbox.style.cssText = 'width:20px;height:20px;cursor:pointer;';
-    const toggleLabel = document.createElement('span');
-    const updateToggleLabel = () => {
-      toggleLabel.innerHTML = toggleCheckbox.checked
-        ? '🟢 Using <b>homework</b> words for the Crab'
-        : '⚪ Using <b>default</b> words for the Crab';
-    };
-    updateToggleLabel();
-    toggleCheckbox.addEventListener('change', updateToggleLabel);
-    toggleRow.appendChild(toggleCheckbox);
-    toggleRow.appendChild(toggleLabel);
-
-    const validate = () => {
-      const { words, errors } = parseHomeworkWords(textarea.value);
-      if (errors.length > 0) {
-        errorBox.textContent = errors.slice(0, 4).join('\n') + (errors.length > 4 ? '\n…and ' + (errors.length - 4) + ' more' : '');
-        status.textContent = words.length > 0 ? ('✓ Parsed ' + words.length + ' valid (with some issues above)') : '';
-        return { words, errors };
-      }
-      errorBox.textContent = '';
-      status.textContent = words.length > 0 ? ('✓ Parsed ' + words.length + ' words') : '';
-      return { words, errors };
-    };
-    textarea.addEventListener('input', validate);
-
-    const btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;';
-
-    const mkBtn = (text, bg, fg) => {
-      const b = document.createElement('button');
-      b.textContent = text;
-      b.style.cssText = 'flex:1;min-width:90px;padding:12px;font-family:inherit;font-size:16px;font-weight:bold;border:3px solid #4a2c1a;border-radius:10px;cursor:pointer;background:' + bg + ';color:' + fg + ';';
-      return b;
-    };
-
-    const saveBtn = mkBtn('💾 SAVE', '#a8e6cf', '#1f5e44');
-    const clearBtn = mkBtn('🗑 CLEAR', '#ffd3b6', '#7a3a14');
-    const closeBtn = mkBtn('✕ CLOSE', '#e0e0e0', '#2a2a2a');
-
-    const dismiss = () => {
-      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+    openParentModePanel(() => {
       this.parentModeOpen = false;
       this.refreshHomeworkIndicator();
-    };
-
-    saveBtn.addEventListener('click', () => {
-      const { words, errors } = validate();
-      if (errors.length > 0) {
-        status.textContent = 'Please fix the issues above first.';
-        return;
-      }
-      if (words.length < 3) {
-        errorBox.textContent = 'Need at least 3 words (so we have enough for distractors).';
-        return;
-      }
-      const pack = {
-        version: 1,
-        active: toggleCheckbox.checked,
-        spelling: { words },
-        savedAt: new Date().toISOString()
-      };
-      HomeworkManager.save(pack);
-      status.textContent = 'Saved! The crab is ready to read 🦀';
-      errorBox.textContent = '';
-      setTimeout(dismiss, 900);
     });
-
-    clearBtn.addEventListener('click', () => {
-      if (!confirm('Clear homework and use defaults?')) return;
-      HomeworkManager.clear();
-      textarea.value = '';
-      toggleCheckbox.checked = false;
-      updateToggleLabel();
-      status.textContent = 'Homework cleared.';
-      errorBox.textContent = '';
-    });
-
-    closeBtn.addEventListener('click', dismiss);
-
-    btnRow.appendChild(saveBtn);
-    btnRow.appendChild(clearBtn);
-    btnRow.appendChild(closeBtn);
-
-    card.appendChild(header);
-    card.appendChild(label);
-    card.appendChild(textarea);
-    card.appendChild(status);
-    card.appendChild(errorBox);
-    card.appendChild(toggleRow);
-    card.appendChild(btnRow);
-    wrap.appendChild(card);
-    document.body.appendChild(wrap);
-
-    // Validate once on open (in case existing data has issues we want to surface)
-    if (existingWords.length > 0) validate();
-    textarea.focus();
   }
 }
 
@@ -4802,6 +4697,980 @@ class PeekScene extends Phaser.Scene {
   }
 }
 
+// ============================================================
+// openParentModePanel — DOM overlay used by both TopDown and Title
+// ============================================================
+function openParentModePanel(onClose) {
+  const existing = HomeworkManager.load();
+  const existingWords = (existing && existing.spelling && existing.spelling.words) ? existing.spelling.words.slice() : [];
+  const useHomework = !!(existing && existing.active);
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:"DM Sans","Comic Sans MS",system-ui,sans-serif;';
+
+  const card = document.createElement('div');
+  card.style.cssText = 'background:#fffaf0;border:4px solid #4a2c1a;border-radius:14px;padding:24px;max-width:520px;width:90%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.4);';
+
+  const header = document.createElement('div');
+  header.textContent = '👋 Hi Mum & Dad — set this week\'s words';
+  header.style.cssText = 'font-size:20px;font-weight:bold;color:#6b4423;margin-bottom:14px;text-align:center;';
+
+  const label = document.createElement('div');
+  label.textContent = 'Paste spelling words separated by commas';
+  label.style.cssText = 'font-size:14px;color:#4a2c1a;margin-bottom:6px;';
+
+  const textarea = document.createElement('textarea');
+  textarea.placeholder = 'e.g. vet, van, hip, pot, had, fun, bad, zip...';
+  textarea.value = existingWords.join(', ');
+  textarea.style.cssText = 'width:100%;box-sizing:border-box;height:120px;padding:10px;border:2px solid #8b6f3a;border-radius:8px;font-family:inherit;font-size:16px;resize:vertical;color:#2a2a2a;background:#fffdf5;';
+
+  const status = document.createElement('div');
+  status.style.cssText = 'margin-top:8px;font-size:14px;min-height:20px;color:#4a2c1a;';
+  const errorBox = document.createElement('div');
+  errorBox.style.cssText = 'margin-top:4px;font-size:13px;color:#c62828;white-space:pre-wrap;';
+
+  const toggleRow = document.createElement('label');
+  toggleRow.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:14px;cursor:pointer;font-size:15px;color:#4a2c1a;';
+  const toggleCheckbox = document.createElement('input');
+  toggleCheckbox.type = 'checkbox';
+  toggleCheckbox.checked = useHomework;
+  toggleCheckbox.style.cssText = 'width:20px;height:20px;cursor:pointer;';
+  const toggleLabel = document.createElement('span');
+  const updateToggleLabel = () => {
+    toggleLabel.innerHTML = toggleCheckbox.checked
+      ? '🟢 Using <b>homework</b> words for the Crab'
+      : '⚪ Using <b>default</b> words for the Crab';
+  };
+  updateToggleLabel();
+  toggleCheckbox.addEventListener('change', updateToggleLabel);
+  toggleRow.appendChild(toggleCheckbox);
+  toggleRow.appendChild(toggleLabel);
+
+  const validate = () => {
+    const { words, errors } = parseHomeworkWords(textarea.value);
+    if (errors.length > 0) {
+      errorBox.textContent = errors.slice(0, 4).join('\n') + (errors.length > 4 ? '\n…and ' + (errors.length - 4) + ' more' : '');
+      status.textContent = words.length > 0 ? ('✓ Parsed ' + words.length + ' valid (with some issues above)') : '';
+      return { words, errors };
+    }
+    errorBox.textContent = '';
+    status.textContent = words.length > 0 ? ('✓ Parsed ' + words.length + ' words') : '';
+    return { words, errors };
+  };
+  textarea.addEventListener('input', validate);
+
+  const btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;';
+  const mkBtn = (text, bg, fg) => {
+    const b = document.createElement('button');
+    b.textContent = text;
+    b.style.cssText = 'flex:1;min-width:90px;padding:12px;font-family:inherit;font-size:16px;font-weight:bold;border:3px solid #4a2c1a;border-radius:10px;cursor:pointer;background:' + bg + ';color:' + fg + ';';
+    return b;
+  };
+  const saveBtn = mkBtn('💾 SAVE', '#a8e6cf', '#1f5e44');
+  const clearBtn = mkBtn('🗑 CLEAR', '#ffd3b6', '#7a3a14');
+  const closeBtn = mkBtn('✕ CLOSE', '#e0e0e0', '#2a2a2a');
+
+  const dismiss = () => {
+    if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+    if (typeof onClose === 'function') onClose();
+  };
+
+  saveBtn.addEventListener('click', () => {
+    const { words, errors } = validate();
+    if (errors.length > 0) { status.textContent = 'Please fix the issues above first.'; return; }
+    if (words.length < 3) { errorBox.textContent = 'Need at least 3 words (so we have enough for distractors).'; return; }
+    HomeworkManager.save({
+      version: 1, active: toggleCheckbox.checked,
+      spelling: { words },
+      savedAt: new Date().toISOString()
+    });
+    status.textContent = 'Saved! The crab is ready to read 🦀';
+    errorBox.textContent = '';
+    setTimeout(dismiss, 900);
+  });
+  clearBtn.addEventListener('click', () => {
+    if (!confirm('Clear homework and use defaults?')) return;
+    HomeworkManager.clear();
+    textarea.value = '';
+    toggleCheckbox.checked = false;
+    updateToggleLabel();
+    status.textContent = 'Homework cleared.';
+    errorBox.textContent = '';
+  });
+  closeBtn.addEventListener('click', dismiss);
+
+  btnRow.appendChild(saveBtn); btnRow.appendChild(clearBtn); btnRow.appendChild(closeBtn);
+  card.appendChild(header); card.appendChild(label); card.appendChild(textarea);
+  card.appendChild(status); card.appendChild(errorBox); card.appendChild(toggleRow); card.appendChild(btnRow);
+  wrap.appendChild(card);
+  document.body.appendChild(wrap);
+  if (existingWords.length > 0) validate();
+  textarea.focus();
+}
+
+// ============================================================
+// openMyAdventurePanel — sticker-album / trophy DOM overlay
+// ============================================================
+function openMyAdventurePanel(onClose) {
+  const save = SaveManager.load();
+  const completed = save.puzzlesSolved;
+  const stopOrder = ['snowy', 'crab', 'snake', 'bat', 'parrot'];
+  const stopMeta = {
+    snowy:  { emoji: '🐀', title: "Snowy's hungry",   line: 'You helped Snowy get cheese! 🧀' },
+    crab:   { emoji: '🦀', title: "Crab's sore claw", line: 'You read the magic words! ✨' },
+    snake:  { emoji: '🐍', title: 'Knotted snake',    line: 'You un-knotted the snake! 🌿' },
+    bat:    { emoji: '🦇', title: "Bat's hurt wing",  line: 'You helped the bat fly again! 🦇' },
+    parrot: { emoji: '🦜', title: 'Lost parrot',      line: 'You guided the parrot home! 🦜' }
+  };
+  const doneCount = stopOrder.filter(id => completed[STOP_CONFIGS[id].puzzleKey]).length;
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:"DM Sans","Comic Sans MS",system-ui,sans-serif;';
+  const card = document.createElement('div');
+  card.style.cssText = 'background:#fffaf0;border:4px solid #4a2c1a;border-radius:14px;padding:24px;max-width:580px;width:92%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.4);';
+
+  const header = document.createElement('div');
+  header.textContent = "Sophia's Adventure 🌟";
+  header.style.cssText = 'font-size:24px;font-weight:bold;color:#6b4423;margin-bottom:6px;text-align:center;';
+
+  const progressLine = document.createElement('div');
+  progressLine.textContent = 'Adventure Progress: ' + doneCount + ' of 5 stops';
+  progressLine.style.cssText = 'font-size:14px;color:#4a2c1a;text-align:center;margin-bottom:8px;';
+
+  const dots = document.createElement('div');
+  dots.style.cssText = 'display:flex;justify-content:center;gap:8px;margin-bottom:16px;';
+  for (let i = 0; i < 5; i++) {
+    const dot = document.createElement('div');
+    const filled = i < doneCount;
+    dot.style.cssText = 'width:22px;height:22px;border-radius:50%;border:2px solid #4a2c1a;background:' + (filled ? '#ffeb3b' : '#e0d5b8') + ';';
+    dots.appendChild(dot);
+  }
+
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:20px;';
+  stopOrder.forEach((id, idx) => {
+    const cfg = STOP_CONFIGS[id];
+    const meta = stopMeta[id];
+    const isDone = !!completed[cfg.puzzleKey];
+    const prereqId = idx > 0 ? stopOrder[idx - 1] : null;
+    const isLocked = prereqId && !completed[STOP_CONFIGS[prereqId].puzzleKey];
+    const stopCard = document.createElement('div');
+    let bg, fg, status;
+    if (isDone) { bg = '#a8e6cf'; fg = '#1f5e44'; status = '✓ Helped!'; }
+    else if (isLocked) { bg = '#d4d4d4'; fg = '#666'; status = '🔒 Locked'; }
+    else { bg = '#fff3a8'; fg = '#7a5a14'; status = '🌟 Ready to help'; }
+    stopCard.style.cssText = 'background:' + bg + ';border:2px solid #4a2c1a;border-radius:10px;padding:12px;text-align:center;color:' + fg + ';' + (isLocked ? 'filter:grayscale(0.6);opacity:0.7;' : '');
+    const big = document.createElement('div');
+    big.textContent = isLocked ? '❓' : meta.emoji;
+    big.style.cssText = 'font-size:34px;line-height:1;margin-bottom:4px;';
+    const nm = document.createElement('div');
+    nm.textContent = cfg.displayName;
+    nm.style.cssText = 'font-size:16px;font-weight:bold;';
+    const ttl = document.createElement('div');
+    ttl.textContent = meta.title;
+    ttl.style.cssText = 'font-size:12px;font-style:italic;margin:2px 0 6px 0;';
+    const stt = document.createElement('div');
+    stt.textContent = status;
+    stt.style.cssText = 'font-size:13px;font-weight:bold;';
+    stopCard.appendChild(big); stopCard.appendChild(nm); stopCard.appendChild(ttl); stopCard.appendChild(stt);
+    if (isDone) {
+      const note = document.createElement('div');
+      note.textContent = meta.line;
+      note.style.cssText = 'font-size:11px;margin-top:6px;color:#4a2c1a;';
+      stopCard.appendChild(note);
+    }
+    grid.appendChild(stopCard);
+  });
+
+  const itemsHeader = document.createElement('div');
+  itemsHeader.textContent = '🎁 Party items collected';
+  itemsHeader.style.cssText = 'font-size:16px;font-weight:bold;color:#6b4423;margin:8px 0 8px 0;';
+  const items = document.createElement('div');
+  items.style.cssText = 'display:flex;flex-wrap:wrap;gap:14px;margin-bottom:16px;font-size:14px;color:#4a2c1a;';
+  const pItems = save.partyItems || {};
+  const itemRow = (emoji, label, val) => {
+    const span = document.createElement('span');
+    span.innerHTML = '<b style="font-size:18px;">' + emoji + '</b> ' + label + ': <b>' + val + '</b>';
+    items.appendChild(span);
+  };
+  itemRow('🧀', 'Cheese', pItems.bananas || 0);
+  itemRow('🌸', 'Flowers', pItems.flowers || 0);
+  itemRow('💎', 'Stones', pItems.stones || 0);
+  itemRow('🎵', 'Music notes', pItems.musicNotes || 0);
+  itemRow('🍌', 'Golden Banana', pItems.goldenBanana ? '✓' : 'Not yet');
+
+  const recordsHeader = document.createElement('div');
+  recordsHeader.textContent = '🏆 Records';
+  recordsHeader.style.cssText = 'font-size:16px;font-weight:bold;color:#6b4423;margin:8px 0 8px 0;';
+  const records = document.createElement('div');
+  records.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin-bottom:18px;font-size:14px;color:#4a2c1a;';
+  const best = save.speedReadBest || { defaultBank: 0, homeworkBank: 0 };
+  if (best.defaultBank > 0) {
+    const r = document.createElement('div');
+    r.innerHTML = '🦀 Speed Read best: <b>' + best.defaultBank + ' words</b>';
+    records.appendChild(r);
+  }
+  if (best.homeworkBank > 0) {
+    const r = document.createElement('div');
+    r.innerHTML = '🦀 Speed Read best (homework): <b>' + best.homeworkBank + ' words</b>';
+    records.appendChild(r);
+  }
+  const bananas = document.createElement('div');
+  bananas.innerHTML = '🐀 Bananas collected: <b>' + (save.bananaCount || 0) + '</b>';
+  records.appendChild(bananas);
+  const fmtDate = (iso) => {
+    if (!iso) return null;
+    try { return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); }
+    catch (e) { return iso; }
+  };
+  const firstDate = fmtDate(save.stats && save.stats.startedAt);
+  const lastDate = fmtDate(save.stats && save.stats.lastPlayedAt);
+  if (firstDate) {
+    const r = document.createElement('div');
+    r.innerHTML = '📅 First played: <b>' + firstDate + '</b>';
+    records.appendChild(r);
+  }
+  if (lastDate) {
+    const r = document.createElement('div');
+    r.innerHTML = '📅 Last played: <b>' + lastDate + '</b>';
+    records.appendChild(r);
+  }
+
+  const backBtn = document.createElement('button');
+  backBtn.textContent = '← Back';
+  backBtn.style.cssText = 'width:100%;padding:12px;font-family:inherit;font-size:16px;font-weight:bold;border:3px solid #4a2c1a;border-radius:10px;cursor:pointer;background:#e0e0e0;color:#2a2a2a;';
+  const dismiss = () => {
+    if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+    if (typeof onClose === 'function') onClose();
+  };
+  backBtn.addEventListener('click', dismiss);
+
+  card.appendChild(header); card.appendChild(progressLine); card.appendChild(dots);
+  card.appendChild(grid);
+  card.appendChild(itemsHeader); card.appendChild(items);
+  card.appendChild(recordsHeader); card.appendChild(records);
+  card.appendChild(backBtn);
+  wrap.appendChild(card);
+  document.body.appendChild(wrap);
+}
+
+// ============================================================
+// TitleScene — entry point, decides Continue/New/Start routing
+// ============================================================
+class TitleScene extends Phaser.Scene {
+  constructor() { super('Title'); }
+
+  create() {
+    this.settingsOpen = false;
+    const cam = this.cameras.main;
+    const cw = cam.width, ch = cam.height;
+    const cx = cw / 2;
+
+    // Warm sky gradient
+    this.add.rectangle(cx, 60, cw, 120, 0xffd180).setScrollFactor(0);
+    this.add.rectangle(cx, 170, cw, 100, 0xffe0a0).setScrollFactor(0);
+    this.add.rectangle(cx, 250, cw, 60, 0xfff0c0).setScrollFactor(0);
+
+    // Sun
+    this.add.circle(cw - 100, 110, 55, 0xfff9c4, 0.4).setScrollFactor(0);
+    this.add.circle(cw - 100, 110, 40, 0xffeb3b, 0.95).setScrollFactor(0);
+    this.add.circle(cw - 108, 102, 14, 0xffffff, 0.7).setScrollFactor(0);
+
+    // Distant cloud wisps
+    for (let i = 0; i < 4; i++) {
+      const cxw = 80 + i * 200 + Phaser.Math.Between(-20, 20);
+      const cy = 130 + Phaser.Math.Between(-15, 15);
+      this.add.ellipse(cxw, cy, 110, 22, 0xffffff, 0.7).setScrollFactor(0);
+      this.add.ellipse(cxw + 22, cy + 4, 80, 18, 0xffffff, 0.7).setScrollFactor(0);
+    }
+
+    // Distant jungle silhouettes
+    for (let i = 0; i < 10; i++) {
+      const tx = -50 + i * 100 + Phaser.Math.Between(-20, 20);
+      this.add.circle(tx, 330, Phaser.Math.Between(40, 70), 0x1b5e20, 0.7);
+    }
+    // Closer jungle
+    for (let i = 0; i < 9; i++) {
+      const tx = -40 + i * 110 + Phaser.Math.Between(-30, 30);
+      this.add.circle(tx, 380, Phaser.Math.Between(45, 75), 0x2e7d32);
+    }
+    // Ground
+    this.add.rectangle(cx, 560, cw, 100, 0x4a7a3a);
+    this.add.rectangle(cx, 510, cw, 30, 0x66bb6a, 0.6);
+
+    // Flowers
+    for (let i = 0; i < 12; i++) {
+      const fx = 20 + Math.random() * (cw - 40);
+      const fy = 510 + Math.random() * 70;
+      const c = Phaser.Math.RND.pick([0xff5e7e, 0xffe066, 0xff8e3c, 0xb967ff, 0xffffff]);
+      this.add.circle(fx, fy, 4, c);
+    }
+
+    // Title text — big bobbing
+    const titleGroup = this.add.container(cx, 100);
+    const titleShadow = this.add.text(2, 4, 'Sophia and the Rat Jungle', {
+      fontFamily: 'Comic Sans MS, Chalkboard SE, system-ui, sans-serif',
+      fontSize: '38px', color: '#000000', fontStyle: 'bold', align: 'center'
+    }).setOrigin(0.5, 0.5).setAlpha(0.35);
+    const titleTxt = this.add.text(0, 0, 'Sophia and the Rat Jungle', {
+      fontFamily: 'Comic Sans MS, Chalkboard SE, system-ui, sans-serif',
+      fontSize: '38px', color: '#ffeb3b', fontStyle: 'bold', align: 'center',
+      stroke: '#4a2c1a', strokeThickness: 5
+    }).setOrigin(0.5, 0.5);
+    titleGroup.add([titleShadow, titleTxt]);
+    this.tweens.add({ targets: titleGroup, y: { from: 100, to: 90 }, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+
+    // Subtitle
+    this.add.text(cx, 152, '~ a small jungle adventure ~', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '15px', color: '#6b4423', fontStyle: 'italic'
+    }).setOrigin(0.5, 0.5);
+
+    // Sophia + rats in centre
+    this.drawSophia(cx, 360);
+    this.drawTitleRat(cx - 70, 410, 0xf5f5f5, 0xffc4c4); // Snowy
+    this.drawTitleRat(cx + 70, 410, 0x2a2a2a, 0xff8888); // Midnight
+
+    // Butterfly
+    this.makeTitleButterfly(80, 230);
+
+    // Sparkles
+    this.time.addEvent({
+      delay: 1500, loop: true, callback: () => {
+        const sx = Phaser.Math.Between(30, cw - 30);
+        const sy = Phaser.Math.Between(450, 540);
+        const star = this.add.star(sx, sy, 4, 3, 7, 0xffeb3b);
+        this.tweens.add({
+          targets: star,
+          y: sy - 80,
+          alpha: { from: 1, to: 0 },
+          scale: { from: 1.2, to: 0 },
+          angle: 360,
+          duration: 1800,
+          ease: 'Cubic.easeOut',
+          onComplete: () => star.destroy()
+        });
+      }
+    });
+
+    // Buttons
+    this.buildTitleButtons();
+
+    this.cameras.main.fadeIn(500, 255, 255, 255);
+  }
+
+  drawSophia(x, y) {
+    const c = this.add.container(x, y);
+    // Hair (back)
+    c.add(this.add.ellipse(0, -8, 36, 38, 0x6b4423));
+    // Body (dress)
+    c.add(this.add.triangle(0, 18, -22, 0, 22, 0, 0, 30, 0xff5e7e));
+    // Body top
+    c.add(this.add.rectangle(0, -2, 26, 22, 0xff8e9e));
+    // Head
+    c.add(this.add.circle(0, -16, 14, 0xffd6b8));
+    // Hair (front fringe)
+    c.add(this.add.ellipse(0, -22, 26, 10, 0x6b4423));
+    c.add(this.add.ellipse(-12, -16, 8, 18, 0x6b4423));
+    c.add(this.add.ellipse(12, -16, 8, 18, 0x6b4423));
+    // Eyes
+    const eyeL = this.add.ellipse(-4, -16, 3, 4, 0x2a2a2a);
+    const eyeR = this.add.ellipse(4, -16, 3, 4, 0x2a2a2a);
+    c.add(eyeL); c.add(eyeR);
+    // Smile
+    c.add(this.add.ellipse(0, -10, 6, 2, 0xc62828));
+    // Arms
+    c.add(this.add.ellipse(-18, 0, 6, 16, 0xffd6b8));
+    c.add(this.add.ellipse(18, 0, 6, 16, 0xffd6b8));
+    // Legs
+    c.add(this.add.ellipse(-7, 30, 6, 14, 0xffd6b8));
+    c.add(this.add.ellipse(7, 30, 6, 14, 0xffd6b8));
+    // Blink
+    this.time.addEvent({
+      delay: 3500, loop: true, callback: () => {
+        eyeL.scaleY = 0.1; eyeR.scaleY = 0.1;
+        this.time.delayedCall(120, () => { eyeL.scaleY = 1; eyeR.scaleY = 1; });
+      }
+    });
+    // Bob
+    this.tweens.add({ targets: c, y: y - 3, duration: 1700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    return c;
+  }
+
+  drawTitleRat(x, y, body, ear) {
+    const c = this.add.container(x, y);
+    c.add(this.add.ellipse(0, 6, 28, 6, 0x000000, 0.35));
+    c.add(this.add.ellipse(0, 0, 30, 20, body));
+    c.add(this.add.circle(14, -1, 9, body));
+    c.add(this.add.circle(16, -8, 4, ear));
+    c.add(this.add.circle(16, 6, 4, ear));
+    c.add(this.add.circle(17, -3, 1.6, 0x2a2a2a));
+    c.add(this.add.circle(17, 3, 1.6, 0x2a2a2a));
+    c.add(this.add.circle(22, 0, 1.8, 0xff8888));
+    this.tweens.add({ targets: c, y: y - 3, duration: 1500 + Math.random() * 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    return c;
+  }
+
+  makeTitleButterfly(x, y) {
+    const cam = this.cameras.main;
+    const c = this.add.container(x, y);
+    const color = Phaser.Math.RND.pick([0xff8e3c, 0xff5e7e, 0xffeb3b, 0xb967ff]);
+    const wing1 = this.add.ellipse(-6, 0, 14, 18, color);
+    const wing2 = this.add.ellipse(6, 0, 14, 18, color);
+    const body = this.add.ellipse(0, 0, 2, 14, 0x4a2c1a);
+    c.add([wing1, wing2, body]);
+    this.tweens.add({
+      targets: c,
+      x: cam.width + 40,
+      y: y + Phaser.Math.Between(-30, 30),
+      duration: 14000,
+      ease: 'Sine.easeInOut',
+      onComplete: () => { c.x = -40; this.makeTitleButterfly(-40, Phaser.Math.Between(150, 320)); c.destroy(); }
+    });
+    this.tweens.add({ targets: [wing1, wing2], scaleX: 0.35, duration: 180, yoyo: true, repeat: -1 });
+    return c;
+  }
+
+  buildTitleButtons() {
+    const cam = this.cameras.main;
+    const cx = cam.width / 2;
+    const save = SaveManager.load();
+    const hasProgress = Object.values(save.puzzlesSolved).some(v => v === true)
+      || (save.bananaCount > 0)
+      || (save.stats && save.stats.openingSeen);
+
+    const mkBtn = (x, y, w, h, bg, fg, label, fontSize, onClick) => {
+      const shadow = this.add.rectangle(x + 4, y + 6, w, h, 0x000000, 0.3);
+      const bgRect = this.add.rectangle(x, y, w, h, bg)
+        .setStrokeStyle(4, 0x4a2c1a)
+        .setInteractive({ useHandCursor: true });
+      const txt = this.add.text(x, y, label, {
+        fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+        fontSize: fontSize + 'px', color: fg, fontStyle: 'bold', align: 'center'
+      }).setOrigin(0.5, 0.5);
+      bgRect.on('pointerover', () => bgRect.setScale(1.04));
+      bgRect.on('pointerout', () => bgRect.setScale(1));
+      bgRect.on('pointerdown', () => { if (!this.settingsOpen) onClick(); });
+      return { shadow, bgRect, txt };
+    };
+
+    if (hasProgress) {
+      mkBtn(cx, 470, 320, 64, 0xa8e6cf, '#1f5e44', '▶ Continue Adventure', 22, () => this.startContinue());
+      mkBtn(cx, 545, 260, 44, 0xffd3b6, '#7a3a14', '🌟 New Adventure', 16, () => this.startNew(true));
+    } else {
+      mkBtn(cx, 500, 320, 70, 0xa8e6cf, '#1f5e44', '▶ Start Adventure', 24, () => this.startNew(false));
+    }
+
+    // Settings gear bottom-right
+    const sX = cam.width - 36, sY = cam.height - 30;
+    const sBg = this.add.circle(sX, sY, 22, 0xfffaf0).setStrokeStyle(3, 0x4a2c1a).setInteractive({ useHandCursor: true });
+    const sTxt = this.add.text(sX, sY, '⚙', { fontFamily: 'DM Sans, system-ui, sans-serif', fontSize: '22px', color: '#4a2c1a' }).setOrigin(0.5, 0.5);
+    sBg.on('pointerdown', () => this.openSettings());
+  }
+
+  startContinue() {
+    this.cameras.main.fadeOut(400, 255, 255, 255);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.start('TopDown', {});
+    });
+  }
+
+  startNew(confirmFirst) {
+    const go = () => {
+      SaveManager.reset();
+      this.cameras.main.fadeOut(400, 255, 255, 255);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.start('Opening', {});
+      });
+    };
+    if (!confirmFirst) {
+      go();
+    } else {
+      if (confirm('Start a brand new adventure? This will wipe your progress.')) go();
+    }
+  }
+
+  openSettings() {
+    if (this.settingsOpen) return;
+    this.settingsOpen = true;
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:"DM Sans","Comic Sans MS",system-ui,sans-serif;';
+    const card = document.createElement('div');
+    card.style.cssText = 'background:#fffaf0;border:4px solid #4a2c1a;border-radius:14px;padding:24px;max-width:380px;width:88%;box-shadow:0 8px 24px rgba(0,0,0,0.4);';
+
+    const h = document.createElement('div');
+    h.textContent = '⚙ Settings';
+    h.style.cssText = 'font-size:20px;font-weight:bold;color:#6b4423;margin-bottom:14px;text-align:center;';
+
+    const mkRow = (label, bg, fg) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.style.cssText = 'display:block;width:100%;margin-bottom:10px;padding:14px;font-family:inherit;font-size:16px;font-weight:bold;border:3px solid #4a2c1a;border-radius:10px;cursor:pointer;background:' + bg + ';color:' + fg + ';';
+      return b;
+    };
+    const adventureBtn = mkRow('📖 My Adventure', '#b5d7f0', '#1a4a6e');
+    const parentBtn = mkRow('👋 Parent Mode (hold 3s)', '#fff3a8', '#7a5a14');
+    const resetBtn = mkRow('🗑 Reset progress', '#ffd3b6', '#7a3a14');
+    const aboutLine = document.createElement('div');
+    aboutLine.textContent = 'Made with love by Sophia & Mum 💛';
+    aboutLine.style.cssText = 'text-align:center;font-style:italic;font-size:13px;color:#6b4423;margin:14px 0 12px 0;';
+    const closeBtn = mkRow('✕ Close', '#e0e0e0', '#2a2a2a');
+
+    const dismiss = () => {
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      this.settingsOpen = false;
+    };
+
+    adventureBtn.addEventListener('click', () => {
+      openMyAdventurePanel(() => {});
+    });
+    resetBtn.addEventListener('click', () => {
+      if (!confirm('Reset all progress? This cannot be undone.')) return;
+      SaveManager.reset();
+      HomeworkManager.clear();
+      dismiss();
+      this.scene.restart();
+    });
+    closeBtn.addEventListener('click', dismiss);
+
+    // Parent Mode requires 3-sec hold
+    let holdTimer = null;
+    let holdPip = null;
+    const cancelHold = () => {
+      if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; }
+      if (holdPip && holdPip.parentNode) holdPip.parentNode.removeChild(holdPip);
+      holdPip = null;
+      parentBtn.style.background = '#fff3a8';
+    };
+    parentBtn.addEventListener('pointerdown', () => {
+      cancelHold();
+      parentBtn.style.background = '#ffcc33';
+      holdPip = document.createElement('span');
+      holdPip.textContent = ' …';
+      holdPip.style.cssText = 'font-size:20px;';
+      parentBtn.appendChild(holdPip);
+      holdTimer = setTimeout(() => {
+        cancelHold();
+        openParentModePanel(() => {});
+      }, 3000);
+    });
+    parentBtn.addEventListener('pointerup', cancelHold);
+    parentBtn.addEventListener('pointerleave', cancelHold);
+    parentBtn.addEventListener('pointercancel', cancelHold);
+
+    card.appendChild(h);
+    card.appendChild(adventureBtn);
+    card.appendChild(parentBtn);
+    card.appendChild(resetBtn);
+    card.appendChild(aboutLine);
+    card.appendChild(closeBtn);
+    wrap.appendChild(card);
+    document.body.appendChild(wrap);
+  }
+}
+
+// ============================================================
+// OpeningScene — 4-bubble intro after Start/New Adventure
+// ============================================================
+class OpeningScene extends Phaser.Scene {
+  constructor() { super('Opening'); }
+
+  create() {
+    const cam = this.cameras.main;
+    const cw = cam.width, ch = cam.height;
+
+    // Soft jungle background gradient
+    this.add.rectangle(cw / 2, 50, cw, 100, 0xffd180);
+    this.add.rectangle(cw / 2, 140, cw, 80, 0xffe0a0);
+    this.add.rectangle(cw / 2, 220, cw, 50, 0xb3e5fc);
+    // Jungle silhouettes
+    for (let i = 0; i < 10; i++) {
+      const tx = -40 + i * 100 + Phaser.Math.Between(-20, 20);
+      this.add.circle(tx, 360, Phaser.Math.Between(45, 75), 0x2e7d32);
+    }
+    this.add.rectangle(cw / 2, 560, cw, 100, 0x4a7a3a);
+    this.add.rectangle(cw / 2, 510, cw, 30, 0x66bb6a, 0.6);
+
+    // Skip button
+    const skip = this.add.text(cw - 14, 14, 'Skip story →', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '13px', color: '#4a2c1a', fontStyle: 'italic'
+    }).setOrigin(1, 0).setInteractive({ useHandCursor: true });
+    skip.on('pointerdown', () => this.finish());
+
+    this.bubbleIndex = 0;
+    this.bubbles = [
+      'Sophia and her rats Snowy and Midnight love adventures.',
+      "Today, they're going to the jungle to throw a party for all their animal friends!",
+      'But the animals need help first — five of them are in trouble.',
+      'Can you help Sophia and her rats save the party?'
+    ];
+
+    // Draw Sophia + rats for visual continuity
+    this.sceneActor = this.add.container(cw / 2, 350);
+    this.drawIntroActors(this.sceneActor);
+
+    this.tapHint = this.add.text(cw / 2, ch - 36, 'Tap to continue', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '13px', color: '#6b4423', fontStyle: 'italic'
+    }).setOrigin(0.5, 0.5);
+    this.tweens.add({ targets: this.tapHint, alpha: { from: 0.4, to: 1 }, duration: 1200, yoyo: true, repeat: -1 });
+
+    this.bubbleBg = null;
+    this.bubbleTxt = null;
+    this.showBubble();
+
+    this.input.on('pointerdown', (p, objs) => {
+      // Don't advance if tap was on skip
+      if (objs && objs.length > 0 && objs[0] === skip) return;
+      this.advance();
+    });
+    const keyHandler = (e) => {
+      if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        this.advance();
+      } else if (e.key === 'Escape') {
+        this.finish();
+      }
+    };
+    window.addEventListener('keydown', keyHandler);
+    this.events.once('shutdown', () => window.removeEventListener('keydown', keyHandler));
+
+    this.cameras.main.fadeIn(400, 255, 255, 255);
+  }
+
+  drawIntroActors(container) {
+    // Sophia centre
+    container.add(this.add.ellipse(0, -8, 36, 38, 0x6b4423));
+    container.add(this.add.triangle(0, 18, -22, 0, 22, 0, 0, 30, 0xff5e7e));
+    container.add(this.add.rectangle(0, -2, 26, 22, 0xff8e9e));
+    container.add(this.add.circle(0, -16, 14, 0xffd6b8));
+    container.add(this.add.ellipse(0, -22, 26, 10, 0x6b4423));
+    container.add(this.add.ellipse(-4, -16, 3, 4, 0x2a2a2a));
+    container.add(this.add.ellipse(4, -16, 3, 4, 0x2a2a2a));
+    container.add(this.add.ellipse(0, -10, 6, 2, 0xc62828));
+    // Snowy left
+    const sX = -56;
+    container.add(this.add.ellipse(sX, 26, 26, 16, 0xf5f5f5));
+    container.add(this.add.circle(sX + 11, 25, 8, 0xf5f5f5));
+    container.add(this.add.circle(sX + 13, 19, 4, 0xffc4c4));
+    container.add(this.add.circle(sX + 13, 31, 4, 0xffc4c4));
+    container.add(this.add.circle(sX + 14, 23, 1.5, 0x2a2a2a));
+    container.add(this.add.circle(sX + 14, 27, 1.5, 0x2a2a2a));
+    // Midnight right
+    const mX = 56;
+    container.add(this.add.ellipse(mX, 26, 26, 16, 0x2a2a2a));
+    container.add(this.add.circle(mX - 11, 25, 8, 0x2a2a2a));
+    container.add(this.add.circle(mX - 13, 19, 4, 0xff8888));
+    container.add(this.add.circle(mX - 13, 31, 4, 0xff8888));
+    container.add(this.add.circle(mX - 14, 23, 1.5, 0xffeb3b));
+    container.add(this.add.circle(mX - 14, 27, 1.5, 0xffeb3b));
+  }
+
+  showBubble() {
+    const cam = this.cameras.main;
+    const cx = cam.width / 2;
+    const bubbleY = 120;
+    if (this.bubbleBg) this.bubbleBg.destroy();
+    if (this.bubbleTxt) this.bubbleTxt.destroy();
+    const text = this.bubbles[this.bubbleIndex];
+    const t = this.add.text(cx, bubbleY, text, {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '22px', color: '#2a2a2a', fontStyle: 'bold', align: 'center',
+      wordWrap: { width: cam.width - 80 }
+    }).setOrigin(0.5, 0.5);
+    const bg = this.add.rectangle(cx, bubbleY, t.width + 40, t.height + 28, 0xfffaf0, 0.97)
+      .setStrokeStyle(3, 0x4a2c1a);
+    t.setDepth(10); bg.setDepth(9);
+    bg.alpha = 0; t.alpha = 0;
+    this.tweens.add({ targets: [bg, t], alpha: 1, scale: { from: 0.92, to: 1 }, duration: 300, ease: 'Back.easeOut' });
+    this.bubbleBg = bg;
+    this.bubbleTxt = t;
+
+    // Progress dots
+    if (this.dotsContainer) this.dotsContainer.destroy();
+    this.dotsContainer = this.add.container(cx, 220);
+    for (let i = 0; i < this.bubbles.length; i++) {
+      const filled = i === this.bubbleIndex;
+      this.dotsContainer.add(this.add.circle(-30 + i * 20, 0, filled ? 6 : 4, filled ? 0xffeb3b : 0x8b6f3a, filled ? 1 : 0.6));
+    }
+  }
+
+  advance() {
+    this.bubbleIndex++;
+    if (this.bubbleIndex >= this.bubbles.length) {
+      this.finish();
+    } else {
+      this.showBubble();
+    }
+  }
+
+  finish() {
+    const save = SaveManager.load();
+    save.stats.openingSeen = true;
+    SaveManager.save(save);
+    this.cameras.main.fadeOut(450, 255, 255, 255);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.start('TopDown', {});
+    });
+  }
+}
+
+// ============================================================
+// EndingScene — closing beat after parrot finale + credits
+// ============================================================
+class EndingScene extends Phaser.Scene {
+  constructor() { super('Ending'); }
+
+  create() {
+    const cam = this.cameras.main;
+    const cw = cam.width, ch = cam.height;
+    const cx = cw / 2;
+
+    // Sunset background (matches parrot finale tone)
+    this.add.rectangle(cx, 30, cw, 60, 0x3a1a4a);
+    this.add.rectangle(cx, 90, cw, 50, 0x7b1fa2);
+    this.add.rectangle(cx, 140, cw, 40, 0xc2185b);
+    this.add.rectangle(cx, 185, cw, 30, 0xef5350);
+    this.add.rectangle(cx, 215, cw, 25, 0xff7043);
+    this.add.rectangle(cx, 245, cw, 25, 0xff9800);
+    this.add.rectangle(cx, 275, cw, 20, 0xffb74d);
+    // Sun
+    this.add.circle(cx, 300, 60, 0xff7043, 0.85);
+    this.add.circle(cx, 300, 40, 0xff9800);
+    // Ground
+    this.add.rectangle(cx, 560, cw, 100, 0x4a7a3a);
+    this.add.rectangle(cx, 510, cw, 30, 0x66bb6a, 0.6);
+
+    // All animals gathered in a row
+    const groundY = 460;
+    this.spawnRat(cx - 130, groundY, 0xf5f5f5, 0xffc4c4); // Snowy
+    this.spawnRat(cx - 95,  groundY, 0x2a2a2a, 0xff8888); // Midnight
+    this.spawnFinaleCrab(cx - 40, groundY);
+    this.drawEndingSophia(cx, groundY - 18);
+    this.spawnFinaleSnake(cx + 50, groundY + 4);
+    this.spawnFinaleBat(cx + 100, groundY - 40);
+    this.spawnFinaleParrot(cx + 140, groundY - 12);
+
+    // Confetti continuous
+    this.confettiTimer = this.time.addEvent({
+      delay: 250, loop: true, callback: () => this.dropConfetti()
+    });
+
+    this.bubbleIndex = 0;
+    this.bubbles = [
+      '🎉 You did it, Sophia!',
+      'All the animals are safe, and the party is in full swing!',
+      'Snowy and Midnight have never been happier.',
+      "You can visit your animal friends anytime — they'll always be here for you."
+    ];
+
+    this.tapHint = this.add.text(cx, ch - 36, 'Tap to continue', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '13px', color: '#ffeb3b', fontStyle: 'italic',
+      stroke: '#000000', strokeThickness: 2
+    }).setOrigin(0.5, 0.5);
+    this.tweens.add({ targets: this.tapHint, alpha: { from: 0.4, to: 1 }, duration: 1200, yoyo: true, repeat: -1 });
+
+    this.bubbleBg = null;
+    this.bubbleTxt = null;
+    this.showBubble();
+
+    this.input.on('pointerdown', () => this.advance());
+    const keyHandler = (e) => {
+      if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        this.advance();
+      }
+    };
+    window.addEventListener('keydown', keyHandler);
+    this.events.once('shutdown', () => window.removeEventListener('keydown', keyHandler));
+
+    this.cameras.main.fadeIn(700, 255, 255, 255);
+  }
+
+  drawEndingSophia(x, y) {
+    const c = this.add.container(x, y);
+    c.add(this.add.ellipse(0, -8, 36, 38, 0x6b4423));
+    c.add(this.add.triangle(0, 18, -22, 0, 22, 0, 0, 30, 0xff5e7e));
+    c.add(this.add.rectangle(0, -2, 26, 22, 0xff8e9e));
+    c.add(this.add.circle(0, -16, 14, 0xffd6b8));
+    c.add(this.add.ellipse(0, -22, 26, 10, 0x6b4423));
+    c.add(this.add.ellipse(-4, -16, 3, 4, 0x2a2a2a));
+    c.add(this.add.ellipse(4, -16, 3, 4, 0x2a2a2a));
+    c.add(this.add.ellipse(0, -10, 6, 2, 0xc62828));
+    this.tweens.add({ targets: c, y: y - 5, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    return c;
+  }
+
+  spawnRat(x, y, body, ear) {
+    const c = this.add.container(x, y);
+    c.add(this.add.ellipse(0, 6, 22, 5, 0x000000, 0.35));
+    c.add(this.add.ellipse(0, 0, 24, 14, body));
+    c.add(this.add.circle(10, -1, 7, body));
+    c.add(this.add.circle(12, -6, 3, ear));
+    c.add(this.add.circle(12, 4, 3, ear));
+    c.add(this.add.circle(13, -3, 1.2, 0x2a2a2a));
+    c.add(this.add.circle(13, 3, 1.2, 0x2a2a2a));
+    this.tweens.add({ targets: c, y: y - 4, duration: 1200 + Math.random() * 400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    return c;
+  }
+
+  spawnFinaleCrab(x, y) {
+    const c = this.add.container(x, y);
+    c.add(this.add.ellipse(0, 6, 32, 6, 0x000000, 0.35));
+    c.add(this.add.ellipse(0, 0, 32, 22, 0xef5350));
+    c.add(this.add.circle(-18, -4, 6, 0xef5350));
+    c.add(this.add.circle(18, -4, 6, 0xef5350));
+    c.add(this.add.circle(-5, -8, 2.5, 0xffffff));
+    c.add(this.add.circle(5, -8, 2.5, 0xffffff));
+    this.tweens.add({ targets: c, y: y - 4, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    return c;
+  }
+
+  spawnFinaleSnake(x, y) {
+    const c = this.add.container(x, y);
+    c.add(this.add.ellipse(0, 6, 30, 6, 0x000000, 0.35));
+    for (let i = 0; i < 5; i++) c.add(this.add.circle(-12 + i * 6, Math.sin(i) * 4, 7, 0x66bb6a));
+    c.add(this.add.circle(20, 0, 10, 0x66bb6a));
+    c.add(this.add.circle(23, -3, 2, 0xffffff));
+    c.add(this.add.circle(23, 3, 2, 0xffffff));
+    this.tweens.add({ targets: c, y: y - 4, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    return c;
+  }
+
+  spawnFinaleBat(x, y) {
+    const c = this.add.container(x, y);
+    const wingL = this.add.triangle(-12, 0, 0, 0, 16, -8, 16, 8, 0x424242);
+    const wingR = this.add.triangle(12, 0, 0, 0, -16, -8, -16, 8, 0x424242);
+    c.add([wingL, wingR]);
+    c.add(this.add.ellipse(0, 0, 16, 20, 0x424242));
+    c.add(this.add.circle(0, -10, 9, 0x424242));
+    c.add(this.add.circle(-3, -10, 2, 0xff5722));
+    c.add(this.add.circle(3, -10, 2, 0xff5722));
+    this.tweens.add({ targets: [wingL, wingR], scaleX: 0.4, duration: 200, yoyo: true, repeat: -1 });
+    this.tweens.add({ targets: c, y: y - 6, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    return c;
+  }
+
+  spawnFinaleParrot(x, y) {
+    const c = this.add.container(x, y);
+    c.add(this.add.ellipse(0, 6, 22, 26, 0x42a5f5));
+    c.add(this.add.circle(0, -10, 11, 0x42a5f5));
+    c.add(this.add.triangle(8, -8, 0, -2, 0, 3, 8, 0, 0xffa726));
+    c.add(this.add.ellipse(-8, 4, 8, 12, 0x1976d2));
+    c.add(this.add.circle(3, -10, 2, 0xffffff));
+    c.add(this.add.circle(3.5, -10, 1, 0x2a2a2a));
+    this.tweens.add({ targets: c, y: y - 6, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    return c;
+  }
+
+  dropConfetti() {
+    const cam = this.cameras.main;
+    const colors = [0xff5e7e, 0xffeb3b, 0xa8e6cf, 0xb5d7f0, 0xd5b8e8, 0xff8e3c];
+    for (let i = 0; i < 3; i++) {
+      const x = Math.random() * cam.width;
+      const piece = this.add.rectangle(x, -10, 6, 10, Phaser.Math.RND.pick(colors));
+      piece.setAngle(Math.random() * 360);
+      this.tweens.add({
+        targets: piece,
+        y: cam.height + 30,
+        x: x + Phaser.Math.Between(-60, 60),
+        angle: piece.angle + 540 * (Math.random() > 0.5 ? 1 : -1),
+        duration: 3500 + Math.random() * 1500,
+        ease: 'Cubic.easeIn',
+        onComplete: () => piece.destroy()
+      });
+    }
+  }
+
+  showBubble() {
+    const cam = this.cameras.main;
+    const cx = cam.width / 2;
+    const bubbleY = 130;
+    if (this.bubbleBg) this.bubbleBg.destroy();
+    if (this.bubbleTxt) this.bubbleTxt.destroy();
+    const text = this.bubbles[this.bubbleIndex];
+    const t = this.add.text(cx, bubbleY, text, {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '22px', color: '#2a2a2a', fontStyle: 'bold', align: 'center',
+      wordWrap: { width: cam.width - 80 }
+    }).setOrigin(0.5, 0.5);
+    const bg = this.add.rectangle(cx, bubbleY, t.width + 40, t.height + 28, 0xfffaf0, 0.97)
+      .setStrokeStyle(3, 0x4a2c1a);
+    t.setDepth(10); bg.setDepth(9);
+    bg.alpha = 0; t.alpha = 0;
+    this.tweens.add({ targets: [bg, t], alpha: 1, scale: { from: 0.92, to: 1 }, duration: 300, ease: 'Back.easeOut' });
+    this.bubbleBg = bg;
+    this.bubbleTxt = t;
+  }
+
+  advance() {
+    this.bubbleIndex++;
+    if (this.bubbleIndex >= this.bubbles.length) {
+      this.showCredits();
+    } else {
+      this.showBubble();
+    }
+  }
+
+  showCredits() {
+    if (this.bubbleBg) this.bubbleBg.destroy();
+    if (this.bubbleTxt) this.bubbleTxt.destroy();
+    if (this.tapHint) this.tapHint.setVisible(false);
+
+    const cam = this.cameras.main;
+    const cx = cam.width / 2;
+    const card = this.add.rectangle(cx, 220, 500, 200, 0xfffaf0, 0.97).setStrokeStyle(4, 0x4a2c1a);
+    const txt = this.add.text(cx, 220,
+      'Sophia and the Rat Jungle\n\nMade with love by\nSophia & Mum 💛\n\nThank you for playing!', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '20px', color: '#4a2c1a', fontStyle: 'bold', align: 'center',
+      wordWrap: { width: 460 }
+    }).setOrigin(0.5, 0.5);
+    card.alpha = 0; txt.alpha = 0;
+    this.tweens.add({ targets: [card, txt], alpha: 1, duration: 600 });
+
+    this.time.delayedCall(2000, () => this.showFinalButtons());
+  }
+
+  showFinalButtons() {
+    const cam = this.cameras.main;
+    const cx = cam.width / 2;
+    const mk = (x, y, w, h, bg, fg, label, onClick) => {
+      const shadow = this.add.rectangle(x + 4, y + 6, w, h, 0x000000, 0.3);
+      const rect = this.add.rectangle(x, y, w, h, bg)
+        .setStrokeStyle(4, 0x4a2c1a)
+        .setInteractive({ useHandCursor: true });
+      const t = this.add.text(x, y, label, {
+        fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+        fontSize: '18px', color: fg, fontStyle: 'bold', align: 'center'
+      }).setOrigin(0.5, 0.5);
+      rect.on('pointerover', () => rect.setScale(1.04));
+      rect.on('pointerout', () => rect.setScale(1));
+      rect.on('pointerdown', onClick);
+      [shadow, rect, t].forEach(el => el.alpha = 0);
+      this.tweens.add({ targets: [shadow, rect, t], alpha: 1, duration: 400 });
+      return { shadow, rect, t };
+    };
+    mk(cx, 410, 320, 60, 0xa8e6cf, '#1f5e44', '▶ Keep Exploring', () => this.exitToMap());
+    mk(cx, 490, 320, 56, 0xffd3b6, '#7a3a14', '🌟 Play Again from Start', () => this.playAgain());
+  }
+
+  exitToMap() {
+    this.cameras.main.fadeOut(500, 255, 255, 255);
+    this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('TopDown', {}));
+  }
+
+  playAgain() {
+    if (!confirm('Start a brand new adventure? This will wipe your progress.')) return;
+    SaveManager.reset();
+    this.cameras.main.fadeOut(500, 255, 255, 255);
+    this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('Title', {}));
+  }
+}
+
 const config = {
   type: Phaser.AUTO,
   parent: 'game',
@@ -4809,7 +5678,7 @@ const config = {
   height: 600,
   backgroundColor: '#2d8a3e',
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-  scene: [TopDownScene, PeekScene, StopScene]
+  scene: [TitleScene, OpeningScene, TopDownScene, PeekScene, StopScene, EndingScene]
 };
 
 window.game = new Phaser.Game(config);
