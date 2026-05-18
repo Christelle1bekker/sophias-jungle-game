@@ -491,7 +491,7 @@ class QuizManager {
     this.options = options || {};
     this.onComplete = this.options.onComplete || (() => {});
     this.onWrong = this.options.onWrong || (() => {});
-    this.questionsToAsk = Math.min(3, questions.length);
+    this.questionsToAsk = Math.min(5, questions.length);
     this.selectedQuestions = [];
     this.currentIndex = 0;
     this.modalElements = [];
@@ -541,60 +541,94 @@ class QuizManager {
     const scene = this.scene;
     const cam = scene.cameras.main;
     const cw = cam.width, ch = cam.height;
-    const cx = cw / 2, cy = ch / 2;
+    const cx = cw / 2;
 
-    const overlay = scene.add.rectangle(cx, cy, cw, ch, 0x000000, 0.55)
+    const cardW = 580;
+
+    const overlay = scene.add.rectangle(cw / 2, ch / 2, cw, ch, 0x000000, 0.55)
       .setScrollFactor(0).setDepth(2000).setInteractive();
 
-    const cardW = 580, cardH = 440;
-    const shadow = scene.add.rectangle(cx + 6, cy + 8, cardW, cardH, 0x000000, 0.3)
-      .setScrollFactor(0).setDepth(2001);
-    const card = scene.add.rectangle(cx, cy, cardW, cardH, 0xfffaf0)
-      .setStrokeStyle(4, 0x4a2c1a)
-      .setScrollFactor(0).setDepth(2001);
-
-    const progress = scene.add.text(cx, cy - cardH / 2 + 26,
+    // Build text first (off-screen at y=0), measure, then position.
+    const progress = scene.add.text(cx, 0,
       'Question ' + (this.currentIndex + 1) + ' of ' + this.questionsToAsk, {
       fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
       fontSize: '16px',
       color: '#6b4423',
       fontStyle: 'bold'
-    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2002);
+    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(2002);
 
     let passageText = null;
-    let questionY = cy - 90;
     if (q.passage) {
-      passageText = scene.add.text(cx, cy - 130, q.passage, {
+      passageText = scene.add.text(cx, 0, q.passage, {
         fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
-        fontSize: '17px',
+        fontSize: '18px',
         color: '#4a2c1a',
         fontStyle: 'italic',
         align: 'center',
-        wordWrap: { width: cardW - 70 }
-      }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2002);
-      questionY = cy - 60;
+        wordWrap: { width: cardW - 80 }
+      }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(2002);
     }
 
-    const questionText = scene.add.text(cx, questionY, q.question, {
+    const questionText = scene.add.text(cx, 0, q.question, {
       fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
       fontSize: q.passage ? '22px' : '26px',
       color: '#2a2a2a',
       fontStyle: 'bold',
       align: 'center',
       wordWrap: { width: cardW - 60 }
-    }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2002);
+    }).setOrigin(0.5, 0).setScrollFactor(0).setDepth(2002);
 
+    // Layout pass: compute heights + Y positions.
+    const topPad = 28;
+    const gapAfterProgress = 14;
+    const gapAfterPassage = 12;
+    const gapAfterQuestion = 26;
     const btnW = 240, btnH = 90;
     const btnGapX = 24, btnGapY = 18;
+    const buttonsBlockH = btnH * 2 + btnGapY;
+    const bottomPad = 28;
+
+    const progressH = progress.height;
+    const passageH = passageText ? passageText.height : 0;
+    const questionH = questionText.height;
+
+    let contentH = topPad + progressH + gapAfterProgress;
+    if (passageText) contentH += passageH + gapAfterPassage;
+    contentH += questionH + gapAfterQuestion + buttonsBlockH + bottomPad;
+
+    const minCardH = 440;
+    const maxCardH = ch * 0.85;
+    const cardH = Phaser.Math.Clamp(contentH, minCardH, maxCardH);
+
+    const cy = ch / 2;
+    const cardTop = cy - cardH / 2;
+
+    let y = cardTop + topPad;
+    progress.setY(y);
+    y += progressH + gapAfterProgress;
+    if (passageText) {
+      passageText.setY(y);
+      y += passageH + gapAfterPassage;
+    }
+    questionText.setY(y);
+    y += questionH + gapAfterQuestion;
+
+    const gridCenterY = y + buttonsBlockH / 2;
+
+    const shadow = scene.add.rectangle(cx + 6, cy + 8, cardW, cardH, 0x000000, 0.3)
+      .setScrollFactor(0).setDepth(2001);
+    const card = scene.add.rectangle(cx, cy, cardW, cardH, 0xfffaf0)
+      .setStrokeStyle(4, 0x4a2c1a)
+      .setScrollFactor(0).setDepth(2001);
+
     const btnColors = [0xa8e6cf, 0xffd3b6, 0xb5d7f0, 0xd5b8e8];
     const btnTextColors = ['#1f5e44', '#7a3a14', '#1a4a6e', '#4e2a6e'];
     const letters = ['A', 'B', 'C', 'D'];
-    const gridTop = cy + 35;
     const buttons = [];
     for (let i = 0; i < 4; i++) {
       const col = i % 2, row = Math.floor(i / 2);
       const bx = cx + (col === 0 ? -(btnW / 2 + btnGapX / 2) : (btnW / 2 + btnGapX / 2));
-      const by = gridTop + (row === 0 ? -(btnH / 2 + btnGapY / 2) : (btnH / 2 + btnGapY / 2));
+      const by = gridCenterY + (row === 0 ? -(btnH / 2 + btnGapY / 2) : (btnH / 2 + btnGapY / 2));
       const bg = scene.add.rectangle(bx, by, btnW, btnH, btnColors[i])
         .setStrokeStyle(3, 0x4a2c1a)
         .setScrollFactor(0).setDepth(2002)
@@ -616,11 +650,11 @@ class QuizManager {
       }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2003);
       const idx = i;
       bg.on('pointerdown', () => this._answerSelected(idx, bg));
-      buttons.push({ bg, letter, answerText, originalColor: btnColors[i] });
+      buttons.push({ bg, letter, answerText, originalColor: btnColors[i], row });
     }
 
     const closeR = 18;
-    const closeBg = scene.add.circle(cx + cardW / 2 - closeR - 8, cy - cardH / 2 + closeR + 8, closeR, 0xff6b6b)
+    const closeBg = scene.add.circle(cx + cardW / 2 - closeR - 8, cardTop + closeR + 8, closeR, 0xff6b6b)
       .setStrokeStyle(3, 0x4a2c1a)
       .setScrollFactor(0).setDepth(2003)
       .setInteractive({ useHandCursor: true });
@@ -631,6 +665,9 @@ class QuizManager {
       fontStyle: 'bold'
     }).setOrigin(0.5, 0.5).setScrollFactor(0).setDepth(2004);
     closeBg.on('pointerdown', () => this.dismiss());
+
+    this.cardH = cardH;
+    this.cardTop = cardTop;
 
     this.modalElements = [overlay, shadow, card, progress, questionText, closeBg, closeText];
     if (passageText) this.modalElements.push(passageText);
@@ -696,9 +733,8 @@ class QuizManager {
     this._hintActive = true;
     const scene = this.scene;
     const cam = scene.cameras.main;
-    const cx = cam.width / 2, cy = cam.height / 2;
-    const cardH = 440;
-    const hintY = cy - cardH / 2 - 30;
+    const cx = cam.width / 2;
+    const hintY = (this.cardTop != null ? this.cardTop : (cam.height / 2 - 220)) - 30;
     const t = scene.add.text(cx, hintY, text, {
       fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
       fontSize: '16px',
