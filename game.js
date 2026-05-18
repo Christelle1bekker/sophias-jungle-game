@@ -434,6 +434,67 @@ const SaveManager = {
 };
 window.SaveManager = SaveManager;
 
+// ============================================================
+// HomeworkManager — parent-set words/sums (spelling only for now)
+// ============================================================
+// Pack shape:
+//   {
+//     version: 1,
+//     active: true|false,
+//     spelling: { words: [string, ...] },
+//     savedAt: ISO timestamp
+//   }
+const HOMEWORK_KEY = 'sophias-rat-jungle-homework';
+const HomeworkManager = {
+  _inMemory: null,
+  load() {
+    try {
+      const raw = localStorage.getItem(HOMEWORK_KEY);
+      if (!raw) return this._inMemory;
+      return JSON.parse(raw);
+    } catch (e) {
+      return this._inMemory;
+    }
+  },
+  save(pack) {
+    try {
+      localStorage.setItem(HOMEWORK_KEY, JSON.stringify(pack));
+    } catch (e) {
+      this._inMemory = pack;
+    }
+  },
+  clear() {
+    try { localStorage.removeItem(HOMEWORK_KEY); } catch (e) {}
+    this._inMemory = null;
+  },
+  hasActivePack() {
+    const pack = this.load();
+    return !!(pack && pack.active && pack.spelling && Array.isArray(pack.spelling.words) && pack.spelling.words.length > 0);
+  },
+  getActiveWords() {
+    if (!this.hasActivePack()) return null;
+    return this.load().spelling.words.slice();
+  }
+};
+window.HomeworkManager = HomeworkManager;
+
+// Parse comma-separated word string. Returns { words: [...], errors: [...] }.
+function parseHomeworkWords(text) {
+  const errors = [];
+  const words = [];
+  if (typeof text !== 'string') return { words, errors: ['Please enter some words.'] };
+  const parts = text.split(',').map(s => s.trim()).filter(s => s.length > 0);
+  for (const raw of parts) {
+    const word = raw.toLowerCase();
+    if (!/^[a-z]{2,6}$/.test(word)) {
+      errors.push("Hmm, '" + raw + "' doesn't look right. Just letters (2-6)!");
+    } else {
+      words.push(word);
+    }
+  }
+  return { words, errors };
+}
+
 let audioCtx = null;
 function getAudioCtx() {
   if (!audioCtx) {
@@ -2177,10 +2238,14 @@ class TopDownScene extends Phaser.Scene {
 
     this.activeQuiz = null;
     this.placeholderOpen = false;
+    this.parentModeOpen = false;
     this.stopMarkers = [];
     this.breadcrumbGraphics = this.add.graphics().setDepth(40);
     this.pathHighlightUntil = 0;
     this.buildStopMarkers();
+
+    this.buildParentModeHoldZone();
+    this.buildHomeworkIndicator();
 
     this.caveDim = this.add.rectangle(400, 300, 800, 600, 0x080820)
       .setAlpha(0)
@@ -2831,7 +2896,7 @@ class TopDownScene extends Phaser.Scene {
     const step = SOPHIA_SPEED * (delta / 1000);
     let dx = 0, dy = 0;
     const quizOpen = this.activeQuiz && this.activeQuiz.isOpen;
-    const modalActive = quizOpen || this.placeholderOpen;
+    const modalActive = quizOpen || this.placeholderOpen || this.parentModeOpen;
     if (!modalActive) {
       if (this.cursors.left.isDown)  dx -= step;
       if (this.cursors.right.isDown) dx += step;
@@ -3574,6 +3639,256 @@ class TopDownScene extends Phaser.Scene {
       if (Math.abs(obj.x - s.x) < hw && Math.abs(obj.y - s.y) < hh) return true;
     }
     return false;
+  }
+
+  // ====================================================
+  // Parent Mode — hold top-right corner for 3 seconds
+  // ====================================================
+  buildParentModeHoldZone() {
+    const cam = this.cameras.main;
+    const cw = cam.width, ch = cam.height;
+    const zoneSize = 90;
+    const zone = this.add.rectangle(cw - zoneSize / 2, zoneSize / 2, zoneSize, zoneSize, 0xffffff, 0)
+      .setScrollFactor(0).setDepth(1500).setInteractive();
+    this.parentHoldZone = zone;
+    this.parentHoldTimer = null;
+    this.parentHoldPip = null;
+
+    const cancel = () => {
+      if (this.parentHoldTimer) {
+        this.parentHoldTimer.remove(false);
+        this.parentHoldTimer = null;
+      }
+      if (this.parentHoldPip) {
+        this.parentHoldPip.destroy();
+        this.parentHoldPip = null;
+      }
+    };
+
+    zone.on('pointerdown', () => {
+      if (this.parentModeOpen || this.placeholderOpen || (this.activeQuiz && this.activeQuiz.isOpen)) return;
+      cancel();
+      const pipX = cw - 14, pipY = 14;
+      this.parentHoldPip = this.add.text(pipX, pipY, '…', {
+        fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+        fontSize: '22px',
+        color: '#ffeb3b',
+        stroke: '#000000',
+        strokeThickness: 3,
+        fontStyle: 'bold'
+      }).setOrigin(1, 0).setScrollFactor(0).setDepth(1501);
+      this.tweens.add({ targets: this.parentHoldPip, alpha: { from: 0.4, to: 1 }, duration: 600, yoyo: true, repeat: -1 });
+      this.parentHoldTimer = this.time.delayedCall(3000, () => {
+        cancel();
+        this.openParentMode();
+      });
+    });
+    zone.on('pointerup', cancel);
+    zone.on('pointerout', cancel);
+    zone.on('pointerupoutside', cancel);
+  }
+
+  buildHomeworkIndicator() {
+    const x = 14, y = 70;
+    this.homeworkIndicatorBg = this.add.rectangle(x, y, 220, 30, 0x000000, 0.55)
+      .setStrokeStyle(2, 0xffeb3b, 0.8)
+      .setOrigin(0, 0.5)
+      .setScrollFactor(0)
+      .setDepth(1000);
+    this.homeworkIndicatorText = this.add.text(x + 12, y, '', {
+      fontFamily: 'DM Sans, Comic Sans MS, system-ui, sans-serif',
+      fontSize: '15px',
+      color: '#ffffff',
+      stroke: '#000000',
+      strokeThickness: 2,
+      fontStyle: 'bold'
+    }).setOrigin(0, 0.5).setScrollFactor(0).setDepth(1001);
+    this.homeworkIndicatorBg.setInteractive({ useHandCursor: true });
+    this.homeworkIndicatorBg.on('pointerdown', () => this.openHomeworkSummary());
+    this.refreshHomeworkIndicator();
+  }
+
+  refreshHomeworkIndicator() {
+    if (!this.homeworkIndicatorBg) return;
+    const active = HomeworkManager.hasActivePack();
+    const words = active ? HomeworkManager.getActiveWords() : null;
+    if (active && words) {
+      const label = '📝 Homework: ' + words.length + (words.length === 1 ? ' word' : ' words');
+      this.homeworkIndicatorText.setText(label);
+      const w = Math.max(180, this.homeworkIndicatorText.width + 24);
+      this.homeworkIndicatorBg.width = w;
+      this.homeworkIndicatorBg.setVisible(true);
+      this.homeworkIndicatorText.setVisible(true);
+    } else {
+      this.homeworkIndicatorBg.setVisible(false);
+      this.homeworkIndicatorText.setVisible(false);
+    }
+  }
+
+  openHomeworkSummary() {
+    if (this.parentModeOpen) return;
+    const words = HomeworkManager.getActiveWords();
+    if (!words || words.length === 0) return;
+
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9998;display:flex;align-items:center;justify-content:center;font-family:"DM Sans","Comic Sans MS",system-ui,sans-serif;';
+    const card = document.createElement('div');
+    card.style.cssText = 'background:#fffaf0;border:4px solid #4a2c1a;border-radius:14px;padding:22px;max-width:360px;width:80%;max-height:70vh;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.4);';
+    const title = document.createElement('div');
+    title.textContent = '📝 This week\'s homework';
+    title.style.cssText = 'font-size:18px;font-weight:bold;color:#6b4423;margin-bottom:14px;text-align:center;';
+    const list = document.createElement('div');
+    list.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;justify-content:center;';
+    for (const w of words) {
+      const chip = document.createElement('span');
+      chip.textContent = w;
+      chip.style.cssText = 'background:#fff3a8;border:2px solid #c9a13d;border-radius:8px;padding:4px 10px;font-size:16px;color:#4a2c1a;font-weight:bold;';
+      list.appendChild(chip);
+    }
+    const hint = document.createElement('div');
+    hint.textContent = 'Tap anywhere to close';
+    hint.style.cssText = 'margin-top:16px;font-size:12px;color:#8b6f3a;font-style:italic;text-align:center;';
+    card.appendChild(title); card.appendChild(list); card.appendChild(hint);
+    wrap.appendChild(card);
+    document.body.appendChild(wrap);
+    const dismiss = () => { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); };
+    wrap.addEventListener('pointerdown', dismiss);
+  }
+
+  openParentMode() {
+    if (this.parentModeOpen) return;
+    this.parentModeOpen = true;
+
+    const existing = HomeworkManager.load();
+    const existingWords = (existing && existing.spelling && existing.spelling.words) ? existing.spelling.words.slice() : [];
+    let useHomework = !!(existing && existing.active);
+
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;display:flex;align-items:center;justify-content:center;font-family:"DM Sans","Comic Sans MS",system-ui,sans-serif;';
+
+    const card = document.createElement('div');
+    card.style.cssText = 'background:#fffaf0;border:4px solid #4a2c1a;border-radius:14px;padding:24px;max-width:520px;width:90%;max-height:90vh;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,0.4);';
+
+    const header = document.createElement('div');
+    header.textContent = '👋 Hi Mum & Dad — set this week\'s words';
+    header.style.cssText = 'font-size:20px;font-weight:bold;color:#6b4423;margin-bottom:14px;text-align:center;';
+
+    const label = document.createElement('div');
+    label.textContent = 'Paste spelling words separated by commas';
+    label.style.cssText = 'font-size:14px;color:#4a2c1a;margin-bottom:6px;';
+
+    const textarea = document.createElement('textarea');
+    textarea.placeholder = 'e.g. vet, van, hip, pot, had, fun, bad, zip...';
+    textarea.value = existingWords.join(', ');
+    textarea.style.cssText = 'width:100%;box-sizing:border-box;height:120px;padding:10px;border:2px solid #8b6f3a;border-radius:8px;font-family:inherit;font-size:16px;resize:vertical;color:#2a2a2a;background:#fffdf5;';
+
+    const status = document.createElement('div');
+    status.style.cssText = 'margin-top:8px;font-size:14px;min-height:20px;color:#4a2c1a;';
+
+    const errorBox = document.createElement('div');
+    errorBox.style.cssText = 'margin-top:4px;font-size:13px;color:#c62828;white-space:pre-wrap;';
+
+    const toggleRow = document.createElement('label');
+    toggleRow.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:14px;cursor:pointer;font-size:15px;color:#4a2c1a;';
+    const toggleCheckbox = document.createElement('input');
+    toggleCheckbox.type = 'checkbox';
+    toggleCheckbox.checked = useHomework;
+    toggleCheckbox.style.cssText = 'width:20px;height:20px;cursor:pointer;';
+    const toggleLabel = document.createElement('span');
+    const updateToggleLabel = () => {
+      toggleLabel.innerHTML = toggleCheckbox.checked
+        ? '🟢 Using <b>homework</b> words for the Crab'
+        : '⚪ Using <b>default</b> words for the Crab';
+    };
+    updateToggleLabel();
+    toggleCheckbox.addEventListener('change', updateToggleLabel);
+    toggleRow.appendChild(toggleCheckbox);
+    toggleRow.appendChild(toggleLabel);
+
+    const validate = () => {
+      const { words, errors } = parseHomeworkWords(textarea.value);
+      if (errors.length > 0) {
+        errorBox.textContent = errors.slice(0, 4).join('\n') + (errors.length > 4 ? '\n…and ' + (errors.length - 4) + ' more' : '');
+        status.textContent = words.length > 0 ? ('✓ Parsed ' + words.length + ' valid (with some issues above)') : '';
+        return { words, errors };
+      }
+      errorBox.textContent = '';
+      status.textContent = words.length > 0 ? ('✓ Parsed ' + words.length + ' words') : '';
+      return { words, errors };
+    };
+    textarea.addEventListener('input', validate);
+
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display:flex;gap:10px;margin-top:18px;flex-wrap:wrap;';
+
+    const mkBtn = (text, bg, fg) => {
+      const b = document.createElement('button');
+      b.textContent = text;
+      b.style.cssText = 'flex:1;min-width:90px;padding:12px;font-family:inherit;font-size:16px;font-weight:bold;border:3px solid #4a2c1a;border-radius:10px;cursor:pointer;background:' + bg + ';color:' + fg + ';';
+      return b;
+    };
+
+    const saveBtn = mkBtn('💾 SAVE', '#a8e6cf', '#1f5e44');
+    const clearBtn = mkBtn('🗑 CLEAR', '#ffd3b6', '#7a3a14');
+    const closeBtn = mkBtn('✕ CLOSE', '#e0e0e0', '#2a2a2a');
+
+    const dismiss = () => {
+      if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+      this.parentModeOpen = false;
+      this.refreshHomeworkIndicator();
+    };
+
+    saveBtn.addEventListener('click', () => {
+      const { words, errors } = validate();
+      if (errors.length > 0) {
+        status.textContent = 'Please fix the issues above first.';
+        return;
+      }
+      if (words.length < 3) {
+        errorBox.textContent = 'Need at least 3 words (so we have enough for distractors).';
+        return;
+      }
+      const pack = {
+        version: 1,
+        active: toggleCheckbox.checked,
+        spelling: { words },
+        savedAt: new Date().toISOString()
+      };
+      HomeworkManager.save(pack);
+      status.textContent = 'Saved! The crab is ready to read 🦀';
+      errorBox.textContent = '';
+      setTimeout(dismiss, 900);
+    });
+
+    clearBtn.addEventListener('click', () => {
+      if (!confirm('Clear homework and use defaults?')) return;
+      HomeworkManager.clear();
+      textarea.value = '';
+      toggleCheckbox.checked = false;
+      updateToggleLabel();
+      status.textContent = 'Homework cleared.';
+      errorBox.textContent = '';
+    });
+
+    closeBtn.addEventListener('click', dismiss);
+
+    btnRow.appendChild(saveBtn);
+    btnRow.appendChild(clearBtn);
+    btnRow.appendChild(closeBtn);
+
+    card.appendChild(header);
+    card.appendChild(label);
+    card.appendChild(textarea);
+    card.appendChild(status);
+    card.appendChild(errorBox);
+    card.appendChild(toggleRow);
+    card.appendChild(btnRow);
+    wrap.appendChild(card);
+    document.body.appendChild(wrap);
+
+    // Validate once on open (in case existing data has issues we want to surface)
+    if (existingWords.length > 0) validate();
+    textarea.focus();
   }
 }
 
